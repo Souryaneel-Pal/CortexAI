@@ -33,6 +33,11 @@ STRESS_LEVEL_DISPLAY = {
     StressLevel.SEVERE_STRESS: "Severe Stress",
 }
 
+# Inverse of STRESS_LEVEL_NAMES -- maps the raw Mental_Health_Status string in
+# numerical.csv back onto the StressLevel enum. The single source of truth
+# for this mapping; import it rather than redefining it locally.
+STRESS_LABEL_NAME_TO_LEVEL = {name: level for level, name in STRESS_LEVEL_NAMES.items()}
+
 # --------------------------------------------------------------------------
 # Facial modality — FER-2013-style, 48x48 grayscale, 7 emotions
 # --------------------------------------------------------------------------

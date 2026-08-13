@@ -127,19 +127,29 @@ but unverified by an actual run, so try it first once real network/data access e
 
 ## P2 — Fusion + multi-task core
 
-- [ ] `src/data/emotion_stress_map.py` bridge finished: projects face/speech emotion logits
-      onto the shared Healthy→Severe axis via the two (distinct) mapping tables
-- [ ] `src/models/fusion.py` — gated cross-modal attention Transformer over the three 256-d
-      embeddings, trained with modality dropout (graceful missing-modality degradation)
-- [ ] `src/models/heads.py` — shared fused representation → 4-class softmax head (MC-dropout
-      uncertainty) + 3-output regression head, plus the score↔class **consistency term**
-- [ ] Joint multi-task loss: class-balanced focal (classification) + Huber (regression),
-      auto-balanced via learned/uncertainty task weights
-- [ ] `src/train/train_fusion.py` — anchored training on the labelled tabular rows
-      (weak-pairing via matched-emotion sampling + distribution alignment from face/speech),
-      with a **tabular-only fallback path** so reported metrics stay honest; coupled
-      cross-modal inference path for when a real face+voice+signal trio exists
-- [ ] First full end-to-end Macro-F1 / RMSE numbers (once data lands)
+- [x] `src/data/emotion_stress_map.py` bridge finished: projects face/speech emotion logits
+      onto the shared Healthy→Severe axis via the two (distinct) mapping tables (done in P0;
+      consumed by `FusionPairDataset`'s matched-emotion sampling)
+- [x] `src/models/fusion.py` — gated cross-modal attention Transformer over the three 256-d
+      embeddings, trained with modality dropout (graceful missing-modality degradation),
+      exposes per-sample modality contribution weights (the "72% physio / 20% face / 8%
+      voice" meter). Verified: shapes, backward pass, explicit missing-modality masking.
+- [x] `src/models/heads.py` — shared fused representation → 4-class softmax head (MC-dropout
+      uncertainty via `predict_with_uncertainty`) + 3-output regression head (range-scaled
+      to the documented 0-34/0-24/0-39 bounds), plus the score↔class **consistency term**
+      (src/train/losses.py). Verified: MC-dropout variance scales with dropout rate.
+- [x] Joint multi-task loss: class-balanced focal (classification) + Huber (regression),
+      auto-balanced via `UncertaintyWeightedMultiTaskLoss` (learned log-variance per task)
+- [x] `src/train/train_fusion.py` — anchored training on the labelled tabular rows via
+      `FusionPairDataset` (weak-pairing by matched-emotion sampling, resampled every epoch),
+      with a **tabular-only fallback path** (face+speech masked via the same modality-dropout
+      mechanism) reported side-by-side with full fusion every validation epoch, so numbers
+      never conflate the two. Frozen-encoder eval-mode bug caught and fixed during
+      verification (requires_grad=False alone doesn't stop BatchNorm/Dropout drift under
+      Lightning's per-epoch `.train()` call).
+- [ ] First full end-to-end Macro-F1 / RMSE numbers — **pending real data**; the training
+      loop itself is verified end-to-end (fast_dev_run against synthetic weakly-paired
+      batches: forward, backward, both fusion and tabular-only metrics logged correctly)
 
 **If blocked:** same data/GPU caveat as P1. Additionally, if wav2vec2 fine-tuning proves
 too slow/heavy in the eventual training environment, fall back to the CNN-BiLSTM speech

@@ -21,10 +21,13 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
 
+from src.data.emotion_stress_map import FACIAL_EMOTION_TO_STRESS, SPEECH_EMOTION_TO_STRESS
 from src.data.schemas import (
     FACIAL_EMOTIONS,
     FACIAL_IMAGE_SIZE,
     SPEECH_EMOTIONS,
+    STRESS_LABEL_NAME_TO_LEVEL,
+    StressLevel,
     TABULAR_FEATURE_COLUMNS,
     TABULAR_TARGET_CLASS_COLUMN,
     TABULAR_TARGET_SCORE_COLUMNS,
@@ -187,3 +190,86 @@ class TabularMentalHealthDataset(Dataset):
 
     def __getitem__(self, idx: int):
         return self.features[idx], self.labels[idx], self.scores[idx]
+
+
+class FusionPairDataset(Dataset):
+    """Anchored, weakly-paired dataset for fusion training
+    (docs/PROJECT_PLAN.md P2, docs/MINDSCOPE_Blueprint.pdf Sec. 02 "STAGE 3").
+
+    The tabular dataset is the only source of real ground truth. This class
+    does NOT invent face+voice+row triples: for each tabular row, it samples
+    a facial image and a speech clip whose OWN native emotion label maps
+    (via src/data/emotion_stress_map.py's modality-specific tables) onto the
+    SAME stress tier the row's real Mental_Health_Status label carries. That
+    is "weak-pairing via matched-emotion sampling" -- plausible stress-tier-
+    consistent evidence, never a claimed identity match.
+
+    Call `resample()` once per epoch (per configs/fusion.yaml's
+    `resample_pairs_every_epoch: true`) to draw a fresh random pairing, so
+    the model doesn't overfit to one arbitrary face/voice per row.
+    """
+
+    def __init__(
+        self,
+        tabular_dataset: TabularMentalHealthDataset,
+        facial_dataset: FacialEmotionDataset,
+        speech_dataset: SpeechEmotionDataset,
+        seed: int = 42,
+    ):
+        self.tabular_dataset = tabular_dataset
+        self.facial_dataset = facial_dataset
+        self.speech_dataset = speech_dataset
+        self._rng = np.random.default_rng(seed)
+
+        self._facial_indices_by_tier = self._index_by_stress_tier(
+            facial_dataset, FACIAL_EMOTION_NAME_TO_IDX, FACIAL_EMOTION_TO_STRESS
+        )
+        self._speech_indices_by_tier = self._index_speech_by_stress_tier(speech_dataset)
+
+        for tier in StressLevel:
+            if not self._facial_indices_by_tier.get(int(tier)):
+                raise ValueError(f"No facial images map to stress tier {tier.name} -- cannot weak-pair.")
+            if not self._speech_indices_by_tier.get(int(tier)):
+                raise ValueError(f"No speech clips map to stress tier {tier.name} -- cannot weak-pair.")
+
+        self.resample()
+
+    @staticmethod
+    def _index_by_stress_tier(facial_dataset, name_to_idx, emotion_to_stress) -> dict[int, list[int]]:
+        idx_to_name = {v: k for k, v in name_to_idx.items()}
+        buckets: dict[int, list[int]] = {int(t): [] for t in StressLevel}
+        for sample_idx, (_source, label_idx) in enumerate(facial_dataset.samples):
+            emotion_name = idx_to_name[label_idx]
+            tier = emotion_to_stress[emotion_name]
+            buckets[int(tier)].append(sample_idx)
+        return buckets
+
+    @staticmethod
+    def _index_speech_by_stress_tier(speech_dataset) -> dict[int, list[int]]:
+        buckets: dict[int, list[int]] = {int(t): [] for t in StressLevel}
+        for sample_idx, (_path, meta) in enumerate(speech_dataset.samples):
+            tier = SPEECH_EMOTION_TO_STRESS[meta["emotion_label"]]
+            buckets[int(tier)].append(sample_idx)
+        return buckets
+
+    def resample(self) -> None:
+        """Draw a fresh random face/speech pairing for every tabular row."""
+        n = len(self.tabular_dataset)
+        labels = self.tabular_dataset.labels
+        facial_pairs = np.empty(n, dtype=np.int64)
+        speech_pairs = np.empty(n, dtype=np.int64)
+        for i in range(n):
+            tier = int(STRESS_LABEL_NAME_TO_LEVEL[labels[i]])
+            facial_pairs[i] = self._rng.choice(self._facial_indices_by_tier[tier])
+            speech_pairs[i] = self._rng.choice(self._speech_indices_by_tier[tier])
+        self._facial_pairs = facial_pairs
+        self._speech_pairs = speech_pairs
+
+    def __len__(self) -> int:
+        return len(self.tabular_dataset)
+
+    def __getitem__(self, idx: int):
+        features, label, scores = self.tabular_dataset[idx]
+        image, _facial_emotion = self.facial_dataset[self._facial_pairs[idx]]
+        waveform, _speech_emotion, _meta = self.speech_dataset[self._speech_pairs[idx]]
+        return features, label, scores, image, waveform

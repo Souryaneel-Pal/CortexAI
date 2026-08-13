@@ -8,6 +8,14 @@ encoders:
   speech_checkpoint: artifacts/checkpoints/speech/best.ckpt
   tabular_checkpoint: artifacts/checkpoints/tabular/best.ckpt
   embed_dim: 256
+  # Freeze the P1 baselines during fusion training (only the fusion block +
+  # heads train). If a checkpoint above is missing, the encoder is used with
+  # its random initialization instead and a warning is logged -- fusion.py
+  # itself is checkpoint-agnostic, this is purely a train_fusion.py concern.
+  freeze_pretrained: true
+  face_backbone: simple_cnn      # must match whatever configs/face.yaml was
+  speech_backbone: cnn_bilstm    # trained with, so the checkpoint loads cleanly
+  tabular_backbone: ft_transformer
 
 pairing:
   strategy: weak_matched_emotion

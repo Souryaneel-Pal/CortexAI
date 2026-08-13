@@ -27,19 +27,14 @@ from torch.utils.data import DataLoader, random_split
 
 from src.data.augment import class_balanced_sample_weights
 from src.data.loaders import FacialEmotionDataset, SpeechEmotionDataset, TabularMentalHealthDataset
-from src.data.schemas import FACIAL_CLASS_COUNTS, RAVDESS_CLASS_COUNTS, StressLevel
+from src.data.schemas import FACIAL_CLASS_COUNTS, RAVDESS_CLASS_COUNTS, STRESS_LABEL_NAME_TO_LEVEL
 from src.eval.metrics import compute_classification_metrics, compute_multitarget_regression_metrics
 from src.models.face_cnn import NUM_FACIAL_EMOTIONS, FaceEmotionEncoder
 from src.models.speech_net import NUM_SPEECH_EMOTIONS, build_speech_encoder
 from src.models.tabular_ft import TabularEncoder
 from src.train.losses import ClassBalancedFocalLoss, class_balanced_weights, score_regression_loss
 
-STRESS_LABEL_TO_IDX = {
-    "Healthy": StressLevel.HEALTHY,
-    "Mild_Stress": StressLevel.MILD_STRESS,
-    "Moderate_Stress": StressLevel.MODERATE_STRESS,
-    "Severe_Stress": StressLevel.SEVERE_STRESS,
-}
+STRESS_LABEL_TO_IDX = STRESS_LABEL_NAME_TO_LEVEL
 
 
 class _BaseModalityModule(pl.LightningModule):
