@@ -8,33 +8,50 @@
 
 ## Table of Contents
 
-1. [Architecture & Pipeline](#architecture--pipeline)
-2. [Key Innovations & Differentiators](#key-innovations--differentiators)
-3. [Evaluation Metrics & Realities](#evaluation-metrics--realities)
-4. [Application Flow & Sign-In](#application-flow--sign-in)
-5. [Admin Model Settings](#admin-model-settings)
-6. [Local Reasoning Stack & Report Provenance](#local-reasoning-stack--report-provenance)
-7. [No Fabricated Data](#no-fabricated-data)
-8. [Tech Stack](#tech-stack)
-9. [API Reference](#api-reference)
-10. [Quick Start & Setup](#quick-start--setup)
-11. [Security Posture](#security-posture)
-12. [Project Structure](#project-structure)
+1. [Demo Recordings](#demo-recordings)
+2. [Architecture & Pipeline](#architecture--pipeline)
+3. [Key Innovations & Differentiators](#key-innovations--differentiators)
+4. [Evaluation Metrics & Realities](#evaluation-metrics--realities)
+5. [Application Flow & Sign-In](#application-flow--sign-in)
+6. [Admin Model Settings](#admin-model-settings)
+7. [Local Reasoning Stack & Report Provenance](#local-reasoning-stack--report-provenance)
+8. [No Fabricated Data](#no-fabricated-data)
+9. [Tech Stack](#tech-stack)
+10. [API Reference](#api-reference)
+11. [Quick Start & Setup](#quick-start--setup)
+12. [Security Posture](#security-posture)
+13. [Project Structure](#project-structure)
 
 ---
 
-<<<<<<< HEAD
-=======
-# Test Cases
+## Demo Recordings
 
-## Test Case 1
+> GitHub renders the players below inline. If your viewer strips the `<video>`
+> tag (some mirrors and offline Markdown readers do), use the download links.
 
-![Test Case 1](<Screen Recording 2026-08-13 at 21.29.21.mp4>)
+### 1 · End-to-end assessment
+Upload or capture a face, add a voice clip, enter the clinical indicators, and run the multimodal assessment.
 
+<video src="https://github.com/SouryaneelPal/CortexAI/raw/main/docs/media/01-assessment-walkthrough.mp4" controls muted playsinline width="100%"></video>
+
+[⬇ Download 01-assessment-walkthrough.mp4](docs/media/01-assessment-walkthrough.mp4)
+
+### 2 · Explainability and the grounded report
+Grad-CAM over the submitted face, signed SHAP across the 18 features, the Masked-Distress Index, and the Ollama-generated cited narrative.
+
+<video src="https://github.com/SouryaneelPal/CortexAI/raw/main/docs/media/02-explainability-and-report.mp4" controls muted playsinline width="100%"></video>
+
+[⬇ Download 02-explainability-and-report.mp4](docs/media/02-explainability-and-report.mp4)
+
+### 3 · Integrated camera and admin settings
+Live camera capture, plus the Admin-only model controls (uncertainty gate, MDI sensitivity, modality overrides).
+
+<video src="https://github.com/SouryaneelPal/CortexAI/raw/main/docs/media/03-camera-and-settings.mp4" controls muted playsinline width="100%"></video>
+
+[⬇ Download 03-camera-and-settings.mp4](docs/media/03-camera-and-settings.mp4)
 
 ---
 
->>>>>>> 9b9f4e1 (fix: update video file extension for Test Case 1 in README)
 ## Architecture & Pipeline
 
 CortexAI operates on a two-stage fusion architecture that respects the fact that the provided datasets are not natively row-paired.
