@@ -88,29 +88,40 @@ or a GPU.
 
 ## P1 — Per-modality baselines
 
-- [ ] `src/models/face_cnn.py` — EfficientNet-B0 (timm) + CBAM attention, fine-tuned head for
+- [x] `src/models/face_cnn.py` — EfficientNet-B0 (timm) + CBAM attention, fine-tuned head for
       7-way FER emotion, exposes penultimate 256-d embedding + Grad-CAM hook points.
       **Fallback (if blocked on timm/pretrained weight download):** 4-block CNN from scratch,
-      documented as such in code and README.
-- [ ] `src/models/speech_net.py` — Wav2Vec2-base (HF Transformers) fine-tuned for 8-way
+      documented as such in code and README. Both backbones verified with real forward/
+      backward passes.
+- [x] `src/models/speech_net.py` — Wav2Vec2-base (HF Transformers) fine-tuned for 8-way
       RAVDESS emotion, 256-d embedding.
       **Fallback (if blocked on downloading wav2vec2 weights, or too slow on CPU):**
-      CNN-BiLSTM over log-Mel spectrograms + SpecAugment (torchaudio).
-- [ ] `src/models/tabular_ft.py` — FT-Transformer (feature tokenizer + transformer) on the
+      CNN-BiLSTM over log-Mel spectrograms + SpecAugment (torchaudio) — verified, wav2vec2
+      path not downloadable in this sandbox (HF Hub not reachable) so verified by code
+      inspection only, wired identically to the CNN-BiLSTM path via the same `embed_dim=256`
+      contract.
+- [x] `src/models/tabular_ft.py` — FT-Transformer (feature tokenizer + transformer) on the
       18 features → 256-d embedding + 4-class/3-score heads, stacked with LightGBM.
-      **Fallback:** residual MLP + BatchNorm.
-- [ ] `src/train/losses.py` — class-balanced focal loss (FER/RAVDESS imbalance), Huber loss
-      for scores
-- [ ] `src/train/train_modality.py` — single-modality training loop (Lightning), config-driven,
-      logs the full metrics.py suite per modality — **these baseline runs double as the
-      ablation study** referenced in P6
-- [ ] Class imbalance handling: SMOTE/class-balanced sampling wired in for FER Disgust
-      (436 vs 7215) and RAVDESS Neutral (96 vs 192)
+      **Fallback:** residual MLP + BatchNorm. Both verified with real forward/backward passes,
+      feature-attention weights checked.
+- [x] `src/train/losses.py` — class-balanced focal loss (FER/RAVDESS imbalance), Huber loss
+      for scores, uncertainty-weighted multi-task loss, consistency loss (used from P2 on)
+- [x] `src/train/train_modality.py` — single-modality training loop (Lightning), config-driven,
+      logs the full metrics.py suite per modality (num_classes generalized: 7-way FER /
+      8-way RAVDESS / 4-way stress) — **these baseline runs double as the ablation study**
+      referenced in P6. All three modality training loops (face/speech/tabular) verified
+      end-to-end with real DataLoader batches via `fast_dev_run`.
+- [x] Class imbalance handling: class-balanced focal loss wired in for FER Disgust
+      (436 vs 7215) and RAVDESS Neutral (96 vs 192); SMOTE hook for tabular (src/data/augment.py)
 
-**If blocked:** no GPU/data in this sandbox → code is written and unit-tested against
-synthetic fixtures (correct shapes, forward/backward pass, loss finiteness, metrics
-harness runs) but **not trained** until the user supplies `data/raw/`. Training is then a
-single `train_modality.py --config configs/<modality>.yaml` invocation away.
+**If blocked:** no GPU/data in this sandbox → all three `train_modality.py` loops are
+verified end-to-end (real DataLoader batches, forward/backward, loss finiteness, full
+metrics-suite logging) against synthetic, schema-correct fixtures, but **not trained on
+real data** until the user supplies `data/raw/`. Training is then a single
+`train_modality.py --config configs/<modality>.yaml` invocation away. wav2vec2 weight
+download was not reachable from this sandbox (HF Hub not on the egress allowlist) — the
+CNN-BiLSTM fallback was exercised instead; wav2vec2 code is written and config-selectable
+but unverified by an actual run, so try it first once real network/data access exists.
 
 ---
 

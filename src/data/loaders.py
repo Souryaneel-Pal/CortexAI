@@ -84,6 +84,8 @@ class FacialEmotionDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx: int):
+        import torch
+
         source, label = self.samples[idx]
         if self._mode == "csv":
             pixels = np.array(source.split(), dtype=np.uint8)
@@ -94,16 +96,34 @@ class FacialEmotionDataset(Dataset):
             image = np.array(Image.open(source).convert("L"))
         if self.transform is not None:
             image = self.transform(image=image)["image"]
+        # Normalize to a (1, H, W) float32 tensor in [0, 1] so DataLoader's
+        # default collate produces a proper (B, 1, H, W) batch straight into
+        # FaceEmotionEncoder -- raw numpy/uint8 arrays would either fail to
+        # collate or feed the model unnormalized pixel values.
+        image = torch.from_numpy(np.ascontiguousarray(image)).float().unsqueeze(0) / 255.0
         return image, label
 
 
 class SpeechEmotionDataset(Dataset):
-    """RAVDESS speech-emotion dataset. One .wav per sample, label parsed from filename."""
+    """RAVDESS speech-emotion dataset. One .wav per sample, label parsed from filename.
 
-    def __init__(self, root: str | Path, transform=None, sample_rate: int = 16000):
+    Waveforms are resampled to `sample_rate` and pad/truncated to a fixed
+    `max_duration_sec` so DataLoader's default collate can batch them --
+    RAVDESS clips are naturally variable-length, which would otherwise fail
+    to stack into a single tensor.
+    """
+
+    def __init__(
+        self,
+        root: str | Path,
+        transform=None,
+        sample_rate: int = 16000,
+        max_duration_sec: float = 4.0,
+    ):
         self.root = _require_path(Path(root), "Speech dataset root")
         self.transform = transform
         self.sample_rate = sample_rate
+        self.max_samples = int(sample_rate * max_duration_sec)
         self.samples: list[tuple[Path, dict]] = []
         for wav_path in sorted(self.root.glob("*.wav")):
             meta = parse_ravdess_filename(wav_path.name)
@@ -115,14 +135,28 @@ class SpeechEmotionDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx: int):
-        wav_path, meta = self.samples[idx]
         import soundfile as sf
+        import torch
+        import torchaudio
 
-        waveform, sr = sf.read(str(wav_path))
+        wav_path, meta = self.samples[idx]
+        waveform, sr = sf.read(str(wav_path), dtype="float32", always_2d=False)
+        waveform = torch.from_numpy(np.atleast_1d(waveform))
+        if waveform.ndim > 1:  # collapse multi-channel to mono
+            waveform = waveform.mean(dim=-1)
+        if sr != self.sample_rate:
+            waveform = torchaudio.functional.resample(waveform, sr, self.sample_rate)
+
         if self.transform is not None:
-            waveform = self.transform(waveform, sr)
+            waveform = self.transform(waveform, self.sample_rate)
+
+        if waveform.shape[0] >= self.max_samples:
+            waveform = waveform[: self.max_samples]
+        else:
+            waveform = torch.nn.functional.pad(waveform, (0, self.max_samples - waveform.shape[0]))
+
         label = SPEECH_EMOTION_NAME_TO_IDX[meta["emotion_label"]]
-        return waveform, label, meta
+        return waveform.float(), label, meta
 
 
 class TabularMentalHealthDataset(Dataset):

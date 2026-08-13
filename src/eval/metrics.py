@@ -76,11 +76,17 @@ def compute_classification_metrics(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     y_proba: np.ndarray | None = None,
+    num_classes: int = N_CLASSES,
 ) -> ClassificationMetrics:
-    """y_true, y_pred: 1-D int arrays of class indices in [0, N_CLASSES).
-    y_proba: optional (n_samples, N_CLASSES) probability matrix for ROC-AUC.
+    """y_true, y_pred: 1-D int arrays of class indices in [0, num_classes).
+    y_proba: optional (n_samples, num_classes) probability matrix for ROC-AUC.
+
+    `num_classes` defaults to the 4-way stress axis (StressLevel) but this
+    same metric suite (docs/Metrics_Used.docx) is reused as-is for the
+    7-way FER and 8-way RAVDESS per-modality baselines in
+    src/train/train_modality.py -- pass num_classes=7 / 8 there.
     """
-    labels = list(range(N_CLASSES))
+    labels = list(range(num_classes))
 
     roc_auc = None
     if y_proba is not None:
