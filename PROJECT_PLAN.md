@@ -160,25 +160,44 @@ embedding contract, so this swap costs nothing downstream.
 
 ## P3 — Explainability + trust layer (Objective 3 — not optional)
 
-- [ ] `src/explain/gradcam.py` — Grad-CAM / Score-CAM on the face encoder's last conv block
-- [ ] `src/explain/ig_audio.py` — Integrated Gradients (Captum) over the speech
-      spectrogram/waveform
-- [ ] `src/explain/shap_tab.py` — SHAP over the 18 tabular features + FT-Transformer attention
-      weights
-- [ ] Fusion attention exposed as the modality-contribution meter (face % / speech % /
-      physio %)
-- [ ] `src/explain/masked_distress.py` — the **Masked-Distress Index**: cross-modal
-      contradiction score (face reads calm/happy, voice+physiology read high-arousal) —
-      the signature feature, gets its own module as directed
-- [ ] `src/explain/counterfactual.py` — DiCE counterfactuals ("if sleep quality rose 2→4,
-      prediction drops to Mild")
-- [ ] `src/explain/conformal.py` — MAPIE conformal prediction sets + MC-dropout, feeding the
-      uncertainty gate that defers low-confidence cases to a human
+- [x] `src/explain/gradcam.py` — Grad-CAM (hooks `FaceEmotionEncoder.gradcam_target_layer`)
+      + Score-CAM, implemented from scratch on torch hooks (no extra dependency). Verified:
+      correct heatmap shape/range, differs by target class, doesn't leak train/eval mode.
+- [x] `src/explain/ig_audio.py` — Integrated Gradients (Captum) over the speech waveform,
+      with a documented vanilla-gradient-saliency fallback if Captum is unavailable, plus
+      `pool_attribution_to_frames` for the "which time-frequency regions mattered" summary.
+      Verified against the CNN-BiLSTM encoder.
+- [x] `src/explain/shap_tab.py` — SHAP (TreeExplainer for LightGBM, GradientExplainer for
+      the FT-Transformer/residual-MLP torch encoders) + `combine_shap_and_attention` merging
+      SHAP with the FT-Transformer's own attention weights. Verified against both backbones.
+- [x] Fusion attention exposed as the modality-contribution meter (face % / speech % /
+      physio %) — `GatedCrossModalFusion.forward`'s `modality_weights` output (P2)
+- [x] `src/explain/masked_distress.py` — the **Masked-Distress Index**:
+      `face_calm * max(voice_high_arousal, physio_high_arousal)`, documented as a
+      CortexAI-original, clinically-unvalidated heuristic (flagged for real-data
+      validation, consistent with the P4 placeholder-KB caveat). Verified: fires on
+      face-calm/voice-or-physio-high-arousal, stays low when face already reads distressed
+      or everything is genuinely calm.
+- [x] `src/explain/counterfactual.py` — DiCE counterfactuals ("if sleep quality rose 2→4,
+      prediction drops to Mild") using DiCE's "random" search method (its default
+      "gradient" method fails against BatchNorm1d layers with a 1-D-input error — verified
+      and documented in code, not silently swapped), plus a dependency-free single-feature
+      grid-search fallback verified against a known decision boundary.
+- [x] `src/explain/conformal.py` — split-conformal **Adaptive Prediction Sets** (primary,
+      dependency-free; empirically verified >=90% coverage at alpha=0.1, and that
+      uncertain predictions yield strictly larger sets than confident ones — the naive LAC
+      threshold method was tried first and rejected because it collapsed both cases to
+      identical singleton sets) + a MAPIE `SplitConformalClassifier` alternate path (MAPIE's
+      1.x API differs completely from the pre-1.0 `MapieClassifier` the docs' tech-stack
+      list implies; pinned `mapie>=1.0.0` and documented the new contract). `UncertaintyGate`
+      combines this with `heads.py`'s MC-dropout confidence to decide human deferral.
 
 **If blocked:** every method here has a documented degraded mode if the primary library is
 unavailable in the target training environment (e.g. Captum IG → simple gradient
 saliency; DiCE → grid-search counterfactual as fallback) — noted inline in each module,
-not silently swapped.
+not silently swapped. Two real issues were hit and fixed during verification rather than
+guessed around: DiCE's gradient method incompatibility with BatchNorm, and MAPIE's 0.x→1.x
+breaking API change.
 
 ---
 

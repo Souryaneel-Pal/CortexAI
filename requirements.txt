@@ -30,7 +30,7 @@ pytorch-tabular>=1.0.2
 shap>=0.42.1
 captum>=0.6.0
 dice-ml>=0.9
-mapie>=0.6.0
+mapie>=1.0.0
 
 # --- RAG, Vector Search & LLM ---
 langchain>=0.1.0
