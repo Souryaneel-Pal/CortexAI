@@ -32,21 +32,21 @@
 ### 1 · End-to-end assessment
 Upload or capture a face, add a voice clip, enter the clinical indicators, and run the multimodal assessment.
 
-<video src="https://github.com/SouryaneelPal/CortexAI/raw/main/docs/media/04-assessment-walkthrough.mp4" controls muted playsinline width="100%"></video>
+<video src="https://github.com/SouryaneelPal/CortexAI/raw/main/docs/media/01-assessment-walkthrough.mp4" controls muted playsinline width="100%"></video>
 
 [⬇ Download 01-assessment-walkthrough.mp4](docs/media/01-assessment-walkthrough.mp4)
 
 ### 2 · Explainability and the grounded report
 Grad-CAM over the submitted face, signed SHAP across the 18 features, the Masked-Distress Index, and the Ollama-generated cited narrative.
 
-<video src="https://github.com/SouryaneelPal/CortexAI/raw/main/docs/media/05-explainability-and-report.mp4" controls muted playsinline width="100%"></video>
+<video src="https://github.com/SouryaneelPal/CortexAI/raw/main/docs/media/02-explainability-and-report.mp4" controls muted playsinline width="100%"></video>
 
 [⬇ Download 02-explainability-and-report.mp4](docs/media/02-explainability-and-report.mp4)
 
 ### 3 · Integrated camera and admin settings
 Live camera capture, plus the Admin-only model controls (uncertainty gate, MDI sensitivity, modality overrides).
 
-<video src="https://github.com/SouryaneelPal/CortexAI/raw/main/docs/media/06-camera-and-settings.mp4" controls muted playsinline width="100%"></video>
+<video src="https://github.com/SouryaneelPal/CortexAI/raw/main/docs/media/03-camera-and-settings.mp4" controls muted playsinline width="100%"></video>
 
 [⬇ Download 03-camera-and-settings.mp4](docs/media/03-camera-and-settings.mp4)
 
