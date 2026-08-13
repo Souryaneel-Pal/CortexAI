@@ -426,3 +426,49 @@ def test_persisted_report_is_not_relabelled_as_a_template(client):
     if second["generator"].startswith("ollama:"):
         assert second["cached"] is False, "a stored llama3.1 narrative is not a template"
         assert second["fallback_reason"] is None
+
+
+def test_confidence_is_not_floored(client):
+    """Confidence must be the model's own number, never clamped upward.
+
+    A previous build rewrote `mean_probs` so the top class always read >= 0.85.
+    On this dataset the honest MC-dropout confidence is below that, so the floor
+    fired on essentially every request: every assessment reported exactly "85%
+    confidence", and -- far worse -- the uncertainty gate could never fire,
+    because it defers when confidence < threshold (default 0.60) and 0.85 is
+    never < 0.60. The system's main safety feature was silently disabled.
+    """
+    confidences = []
+    for i in range(4):
+        features = _sample_tabular_features()
+        # Vary the input so identical confidences can only mean clamping.
+        features["Sleep_Quality"] = 1.0 + i
+        features["Heart_Rate_BPM"] = 60.0 + i * 12
+        body = client.post("/predict", json={"tabular_features": features}).json()
+
+        confidences.append(body["confidence"])
+        probs = body["class_probs"]
+        assert abs(sum(probs) - 1.0) < 1e-3, "class probabilities must remain a distribution"
+        assert abs(max(probs) - body["confidence"]) < 1e-6, "confidence must equal the top class probability"
+        assert body["confidence"] != 0.85, "confidence is pinned at the old hardcoded floor"
+
+    assert len(set(confidences)) > 1, (
+        f"every input produced the same confidence {confidences[0]} -- the confidence floor is back"
+    )
+
+
+def test_uncertainty_gate_can_actually_defer(client, admin_client):
+    """The gate must be reachable: raising the threshold above the model's
+    confidence has to route the case to a human."""
+    original = admin_client.get("/api/settings").json()
+    try:
+        admin_client.put("/api/settings", json={**original, "uncertainty_threshold": 0.99})
+        body = client.post("/predict", json={"tabular_features": _sample_tabular_features()}).json()
+        assert body["confidence"] < 0.99
+        assert body["deferred_to_human"] is True, "gate did not defer despite confidence below threshold"
+
+        admin_client.put("/api/settings", json={**original, "uncertainty_threshold": 0.01})
+        body = client.post("/predict", json={"tabular_features": _sample_tabular_features()}).json()
+        assert body["deferred_to_human"] is False
+    finally:
+        admin_client.put("/api/settings", json=original)

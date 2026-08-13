@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CortexAI</title>
+    <!-- Paint the browser chrome to match the active theme. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f9ff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#080e19" />
+    <title>CortexAI · Explainable Multimodal Psychiatric Screening</title>
     <meta
       name="description"
       content="CortexAI — explainable multimodal AI decision-support console for psychiatric/mental-health screening."
@@ -24,6 +27,17 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Applied pre-paint to avoid a light flash for dark-theme users.
+      (function () {
+        try {
+          var stored = localStorage.getItem('cortexai.theme')
+          var dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
+          document.documentElement.classList.toggle('dark', dark)
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        } catch (e) {}
+      })()
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

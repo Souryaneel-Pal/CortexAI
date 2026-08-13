@@ -89,7 +89,11 @@ export function PopulationAnalytics() {
     : []
 
   return (
-    <AppShell title="Executive Analytics" showSearch searchPlaceholder="Search analytics...">
+    <AppShell
+      eyebrow="Cohort"
+      title="Executive Analytics"
+      subtitle="Aggregate patterns across every stored assessment. Derived from real history — never from placeholder data."
+    >
       {(running || error || backendReachable === false) && (
         <div
           role="status"
@@ -114,7 +118,7 @@ export function PopulationAnalytics() {
       )}
 
       {prediction && (
-        <section className="mb-lg rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1">
+        <section className="mb-lg rounded-xl panel p-lg">
           <div className="mb-md flex flex-wrap items-center justify-between gap-sm">
             <h3 className="font-headline-sm text-headline-sm text-on-surface">Current Session (live model output)</h3>
             <span className="font-label-sm text-label-sm text-on-surface-variant">
@@ -170,7 +174,7 @@ export function PopulationAnalytics() {
         </section>
       )}
       {/* Filters & Controls Bar */}
-      <div className="mb-lg flex flex-col items-start justify-between gap-md rounded-xl border border-outline-variant bg-surface p-md shadow-level-1 sm:flex-row sm:items-center">
+      <div className="mb-lg flex flex-col items-start justify-between gap-md rounded-xl panel p-md sm:flex-row sm:items-center">
         <div className="flex flex-wrap items-center gap-md">
           <div className="flex items-center gap-2">
             <label className="font-label-sm text-label-sm text-on-surface-variant">Time Range:</label>
@@ -218,7 +222,7 @@ export function PopulationAnalytics() {
         {data.kpis.map((kpi) => (
           <div
             key={kpi.label}
-            className={`relative col-span-12 flex flex-col gap-sm overflow-hidden rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 sm:col-span-6 lg:col-span-3 ${
+            className={`relative col-span-12 flex flex-col gap-sm overflow-hidden rounded-xl panel p-lg sm:col-span-6 lg:col-span-3 ${
               kpi.isAi ? 'ai-glow' : ''
             }`}
           >
@@ -250,7 +254,7 @@ export function PopulationAnalytics() {
         ))}
 
         {/* Stress Severity Heatmap */}
-        <div className="col-span-12 flex min-h-[360px] flex-col rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-7">
+        <div className="col-span-12 flex min-h-[360px] flex-col rounded-xl panel p-lg lg:col-span-7">
           <div className="mb-md flex items-center justify-between">
             <div>
               <h3 className="font-headline-sm text-headline-sm text-on-surface">Stress Severity Heatmap</h3>
@@ -295,7 +299,7 @@ export function PopulationAnalytics() {
         </div>
 
         {/* Emotion Frequency (radar) */}
-        <div className="col-span-12 flex min-h-[360px] flex-col rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-5">
+        <div className="col-span-12 flex min-h-[360px] flex-col rounded-xl panel p-lg lg:col-span-5">
           <div className="mb-md flex items-center justify-between">
             <div>
               <h3 className="font-headline-sm text-headline-sm text-on-surface">Emotion Frequency</h3>
@@ -322,7 +326,7 @@ export function PopulationAnalytics() {
         </div>
 
         {/* Population Risk Breakdown */}
-        <div className="col-span-12 flex min-h-[300px] flex-col rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-6">
+        <div className="col-span-12 flex min-h-[300px] flex-col rounded-xl panel p-lg lg:col-span-6">
           <div className="mb-md">
             <h3 className="font-headline-sm text-headline-sm text-on-surface">Population Risk Breakdown</h3>
             <p className="font-body-sm text-body-sm text-on-surface-variant">Stratification by demographic segments.</p>
@@ -350,7 +354,7 @@ export function PopulationAnalytics() {
         </div>
 
         {/* Physiological Correlation matrix */}
-        <div className="col-span-12 flex min-h-[300px] flex-col rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-6">
+        <div className="col-span-12 flex min-h-[300px] flex-col rounded-xl panel p-lg lg:col-span-6">
           <div className="mb-md">
             <h3 className="font-headline-sm text-headline-sm text-on-surface">Physiological Correlation</h3>
             <p className="font-body-sm text-body-sm text-on-surface-variant">Signal relationship to stress events.</p>

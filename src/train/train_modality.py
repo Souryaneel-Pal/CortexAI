@@ -43,7 +43,12 @@ from omegaconf import OmegaConf
 from torch.utils.data import DataLoader, Subset, TensorDataset
 
 from src.data.augment import class_balanced_sample_weights, tabular_smote
-from src.data.loaders import FacialEmotionDataset, SpeechEmotionDataset, TabularMentalHealthDataset
+from src.data.loaders import (
+    DEFAULT_FERPLUS_CSV,
+    FacialEmotionDataset,
+    SpeechEmotionDataset,
+    TabularMentalHealthDataset,
+)
 from src.data.schemas import STRESS_LABEL_NAME_TO_LEVEL, STRESS_LEVEL_NAMES, StressLevel
 from src.eval.metrics import compute_classification_metrics, compute_multitarget_regression_metrics
 from src.models.face_cnn import NUM_FACIAL_EMOTIONS, FaceEmotionEncoder
@@ -86,7 +91,12 @@ class FaceLightningModule(_BaseModalityModule):
             backbone=cfg.model.backbone, pretrained=cfg.model.pretrained, dropout=cfg.model.dropout
         )
         weights = class_balanced_weights(
-            _facial_class_counts_from_disk(cfg.data.root), beta=cfg.imbalance.class_balanced_beta
+            _facial_class_counts_from_disk(
+                cfg.data.root,
+                cfg.data.get("label_source", "folders"),
+                cfg.data.get("ferplus_csv", DEFAULT_FERPLUS_CSV),
+            ),
+            beta=cfg.imbalance.class_balanced_beta,
         )
         self.criterion = ClassBalancedFocalLoss(class_weights=weights, gamma=cfg.imbalance.focal_gamma)
         self._val_outputs: list[tuple[torch.Tensor, torch.Tensor]] = []
@@ -255,10 +265,10 @@ def load_config(path: str):
 # constants), so a partial or re-sampled copy of the dataset still gets
 # correctly-sized class-balanced loss weights.
 # --------------------------------------------------------------------------
-def _facial_class_counts_from_disk(root) -> dict[str, int]:
+def _facial_class_counts_from_disk(root, label_source: str = "folders", ferplus_csv=DEFAULT_FERPLUS_CSV) -> dict[str, int]:
     from src.data.schemas import FACIAL_EMOTIONS
 
-    dataset = FacialEmotionDataset(root, train=False)
+    dataset = FacialEmotionDataset(root, train=False, label_source=label_source, ferplus_csv=ferplus_csv)
     labels = dataset.labels
     return {name: int((labels == idx).sum()) for idx, name in FACIAL_EMOTIONS.items() if (labels == idx).any()}
 
@@ -290,8 +300,14 @@ def build_dataloaders_facial(cfg):
     one augments (minority classes more aggressively), the validation one
     does not.
     """
-    train_source = FacialEmotionDataset(cfg.data.root, train=True)
-    eval_source = FacialEmotionDataset(cfg.data.root, train=False)
+    label_source = cfg.data.get("label_source", "folders")
+    ferplus_csv = cfg.data.get("ferplus_csv", DEFAULT_FERPLUS_CSV)
+    train_source = FacialEmotionDataset(
+        cfg.data.root, train=True, label_source=label_source, ferplus_csv=ferplus_csv
+    )
+    eval_source = FacialEmotionDataset(
+        cfg.data.root, train=False, label_source=label_source, ferplus_csv=ferplus_csv
+    )
     labels = eval_source.labels
 
     train_idx, val_idx = _stratified_split_indices(labels, cfg.data.val_split, cfg.train.seed)

@@ -1,4 +1,9 @@
-from src.data.loaders import FacialEmotionDataset, SpeechEmotionDataset, TabularMentalHealthDataset
+from src.data.loaders import (
+    FACIAL_EMOTION_NAME_TO_IDX,
+    FacialEmotionDataset,
+    SpeechEmotionDataset,
+    TabularMentalHealthDataset,
+)
 from src.data.schemas import STRESS_LABEL_NAME_TO_LEVEL, StressLevel, TABULAR_FEATURE_COLUMNS
 
 
@@ -97,3 +102,93 @@ def test_speech_dataset_deduplicates_repeated_clips(synthetic_speech_dir, tmp_pa
 
     ds = SpeechEmotionDataset(root)
     assert len(ds) == 15  # not 30 -- the duplicate copy is dropped by filename
+
+
+# ---------------------------------------------------------------------------
+# FER+ labels
+#
+# FER+ re-annotates the same FER2013 images and is joined purely on the row
+# index encoded in each filename. That join is silent when it breaks -- labels
+# would just be wrong -- so it gets pinned.
+# ---------------------------------------------------------------------------
+def test_ferplus_majority_vote_maps_to_the_seven_class_schema(tmp_path):
+    import pandas as pd
+
+    from src.data.loaders import FERPLUS_VOTE_COLUMNS, load_ferplus_labels
+
+    rows = [
+        # index 0: clear happiness
+        ("Training", "fer0.png", 0, 9, 0, 1, 0, 0, 0, 0, 0, 0),
+        # index 1: clear anger
+        ("Training", "fer1.png", 1, 0, 0, 0, 8, 1, 0, 0, 0, 0),
+        # index 2: contempt wins -- excluded, no slot in the 7-class schema
+        ("Training", "fer2.png", 1, 0, 0, 0, 0, 0, 0, 9, 0, 0),
+        # index 3: "not a face" wins -- excluded
+        ("Training", "fer3.png", 0, 0, 0, 0, 0, 0, 0, 0, 1, 9),
+        # A non-Training row must never enter the index space.
+        ("PublicTest", "fer4.png", 10, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    ]
+    csv = tmp_path / "fer2013new.csv"
+    pd.DataFrame(rows, columns=["Usage", "Image name", *FERPLUS_VOTE_COLUMNS]).to_csv(csv, index=False)
+
+    labels = load_ferplus_labels(csv)
+
+    assert set(labels) == {0, 1}, "contempt / NF rows must be excluded, PublicTest rows must not appear"
+    assert labels[0] == FACIAL_EMOTION_NAME_TO_IDX["Happy"]
+    assert labels[1] == FACIAL_EMOTION_NAME_TO_IDX["Angry"]
+
+
+def test_ferplus_indices_are_relative_to_the_training_split(tmp_path):
+    """FER+ covers all 35,887 FER2013 rows but the extracted folders hold only
+    the 28,709 Training ones. If PublicTest rows were kept, every index after
+    the first would point at the wrong image."""
+    import pandas as pd
+
+    from src.data.loaders import FERPLUS_VOTE_COLUMNS, load_ferplus_labels
+
+    rows = [
+        ("PublicTest", "a.png", 10, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        ("Training", "b.png", 0, 10, 0, 0, 0, 0, 0, 0, 0, 0),
+    ]
+    csv = tmp_path / "fer2013new.csv"
+    pd.DataFrame(rows, columns=["Usage", "Image name", *FERPLUS_VOTE_COLUMNS]).to_csv(csv, index=False)
+
+    labels = load_ferplus_labels(csv)
+    # The single Training row must be index 0, not index 1.
+    assert labels == {0: FACIAL_EMOTION_NAME_TO_IDX["Happy"]}
+
+
+def test_ferplus_min_vote_fraction_drops_ambiguous_images(tmp_path):
+    import pandas as pd
+
+    from src.data.loaders import FERPLUS_VOTE_COLUMNS, load_ferplus_labels
+
+    rows = [
+        ("Training", "a.png", 5, 5, 0, 0, 0, 0, 0, 0, 0, 0),  # 50% agreement
+        ("Training", "b.png", 9, 1, 0, 0, 0, 0, 0, 0, 0, 0),  # 90% agreement
+    ]
+    csv = tmp_path / "fer2013new.csv"
+    pd.DataFrame(rows, columns=["Usage", "Image name", *FERPLUS_VOTE_COLUMNS]).to_csv(csv, index=False)
+
+    assert len(load_ferplus_labels(csv, min_vote_fraction=0.0)) == 2
+    assert set(load_ferplus_labels(csv, min_vote_fraction=0.8)) == {1}
+
+
+def test_ferplus_on_non_indexed_filenames_fails_loudly(synthetic_facial_dir, tmp_path):
+    """FER+ joins on the row index in the filename. A corpus whose files are
+    not index-named cannot be matched, and that must be an explicit error --
+    not a silent empty dataset, and not the generic "no images found" message,
+    which would send someone to re-download data they already have."""
+    import pandas as pd
+    import pytest
+
+    from src.data.loaders import FERPLUS_VOTE_COLUMNS
+
+    csv = tmp_path / "fer2013new.csv"
+    pd.DataFrame(
+        [("Training", "fer0.png", 0, 10, 0, 0, 0, 0, 0, 0, 0, 0)],
+        columns=["Usage", "Image name", *FERPLUS_VOTE_COLUMNS],
+    ).to_csv(csv, index=False)
+
+    with pytest.raises(ValueError, match="FER2013 row index"):
+        FacialEmotionDataset(synthetic_facial_dir, label_source="ferplus", ferplus_csv=csv)

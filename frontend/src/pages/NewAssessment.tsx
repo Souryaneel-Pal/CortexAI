@@ -123,21 +123,16 @@ export function NewAssessment() {
   }
 
   return (
-    <AppShell>
-      <div className="flex flex-col gap-xs mb-xl">
-        <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
-          New Screening Session
-        </h1>
-        <p className="max-w-3xl font-body-lg text-body-lg leading-relaxed text-on-surface-variant">
-          Input patient demographic, behavioral, physiological, and audiovisual metrics to compute the cross-modal distress assessment index.
-        </p>
-      </div>
-
-      <div className="mt-xl grid grid-cols-1 gap-lg lg:grid-cols-3">
+    <AppShell
+      eyebrow="Step 1 of 2"
+      title="New Screening Session"
+      subtitle="Capture demographic, behavioural, physiological and audio-visual signals to compute the cross-modal distress assessment."
+    >
+      <div className="grid grid-cols-1 gap-lg lg:grid-cols-3">
         {/* Step 1 & 2: Media Upload Column */}
         <div className="flex flex-col gap-lg lg:col-span-1">
           {/* Patient Details */}
-          <section className="flex flex-col gap-md rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-level-1">
+          <section className="flex flex-col gap-md rounded-xl panel p-lg">
             <div className="flex items-center gap-sm">
               <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-container font-label-sm text-label-sm text-on-primary">
                 P
@@ -174,7 +169,7 @@ export function NewAssessment() {
           </section>
 
           {/* Step 1: Facial Analysis Upload */}
-          <section className="group relative flex flex-col gap-md overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-level-1">
+          <section className="group relative flex flex-col gap-md overflow-hidden rounded-xl panel p-lg">
             <div className="flex items-center gap-sm">
               <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-container font-label-sm text-label-sm text-on-primary">
                 1
@@ -249,7 +244,7 @@ export function NewAssessment() {
           </section>
 
           {/* Step 2: Speech Analysis Upload */}
-          <section className="group relative flex flex-col gap-md overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-level-1">
+          <section className="group relative flex flex-col gap-md overflow-hidden rounded-xl panel p-lg">
             <div className="flex items-center gap-sm">
               <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-container font-label-sm text-label-sm text-on-primary">
                 2
@@ -293,7 +288,7 @@ export function NewAssessment() {
 
         {/* Step 3: 5 Key Clinical Features Form */}
         <div className="lg:col-span-2">
-          <section className="flex flex-col gap-md rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-level-1">
+          <section className="flex flex-col gap-md rounded-xl panel p-lg">
             <div className="mb-sm flex items-center gap-sm">
               <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-container font-label-sm text-label-sm text-on-primary">
                 3

@@ -88,13 +88,14 @@ export function Results() {
     : [-1, 1]
 
   return (
-    <AppShell title="Assessment Results">
+    <AppShell
+      eyebrow="Step 2 of 2"
+      title="Diagnostic Result Details"
+      subtitle="Prediction, severity scores, and the evidence behind them — attribution per modality, per feature, and per frame."
+    >
       <div className="mb-xl flex flex-col gap-md md:flex-row md:items-center md:justify-between border-b border-outline-variant pb-md">
         <div>
-          <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-xs">
-            Diagnostic Result Details
-          </h2>
-          <p className="font-body-lg text-body-lg text-on-surface-variant">
+          <p className="font-body-md text-body-md text-on-surface-variant">
             {prediction ? (
               <>
                 Session: <span className="font-label-md text-label-md text-primary">{prediction.session_id.slice(0, 8)}</span> ·
@@ -146,7 +147,7 @@ export function Results() {
 
       {prediction && (
         <div className="mb-lg grid grid-cols-1 gap-lg sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1">
+          <div className="rounded-xl panel p-lg">
             <span className="font-label-sm text-label-sm text-on-surface-variant">Predicted Status</span>
             <p className="mt-xs font-headline-sm text-headline-sm text-on-surface">
               {SEVERITY_LABEL[prediction.predicted_class] ?? prediction.predicted_class}
@@ -162,7 +163,7 @@ export function Results() {
               ['Stress', prediction.scores.Stress_Score, 39],
             ] as const
           ).map(([label, score, max]) => (
-            <div key={label} className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1">
+            <div key={label} className="rounded-xl panel p-lg">
               <span className="font-label-sm text-label-sm text-on-surface-variant">{label} Score</span>
               <p className="mt-xs font-headline-sm text-headline-sm text-on-surface">
                 {score.toFixed(1)}
@@ -230,7 +231,7 @@ export function Results() {
 
         {/* Grad-CAM */}
         {explanation?.gradcam && (
-          <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-1">
+          <div className="rounded-xl panel p-lg lg:col-span-1">
             <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Facial Attention Mapping (Grad-CAM)</h3>
             <div className="flex items-center justify-center gap-md">
               {faceImageDataUrl && (
@@ -261,7 +262,7 @@ export function Results() {
 
         {/* MDI */}
         {mdi && !mdi.unavailable_reason && (
-          <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-2">
+          <div className="rounded-xl panel p-lg lg:col-span-2">
             <div className="mb-md flex items-center justify-between">
               <h3 className="font-headline-sm text-headline-sm text-on-surface">Masked-Distress Index (MDI)</h3>
               <span
@@ -309,7 +310,7 @@ export function Results() {
         )}
 
         {/* Feature Importance (SHAP) */}
-        <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-2">
+        <div className="rounded-xl panel p-lg lg:col-span-2">
           <div className="mb-md flex items-center justify-between">
             <h3 className="font-headline-sm text-headline-sm text-on-surface">Attribution Analysis (SHAP Values)</h3>
             <button
@@ -350,7 +351,7 @@ export function Results() {
         </div>
 
         {/* Modality Contribution Donut */}
-        <div className="flex flex-col rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-1">
+        <div className="flex flex-col rounded-xl panel p-lg lg:col-span-1">
           <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Contribution Weights by Modality</h3>
           <div className="relative flex flex-1 items-center justify-center py-md">
             <ResponsiveContainer width="100%" height={200}>
@@ -392,7 +393,7 @@ export function Results() {
 
         {/* Speech Integrated Gradients */}
         {explanation?.audio_integrated_gradients && (
-          <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-3">
+          <div className="rounded-xl panel p-lg lg:col-span-3">
             <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">
               Acoustic Attribution Timeline (Integrated Gradients)
             </h3>
@@ -424,7 +425,7 @@ export function Results() {
         )}
 
         {/* Detailed Breakdown Table */}
-        <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-3">
+        <div className="rounded-xl panel p-lg lg:col-span-3">
           <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Categorical Signal Diagnostics</h3>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left">
@@ -455,7 +456,7 @@ export function Results() {
         {expanded && (
           <>
             {/* Acoustic & Prosodic Analysis */}
-            <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-1">
+            <div className="rounded-xl panel p-lg lg:col-span-1">
               <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Acoustic &amp; Prosodic Analysis</h3>
               <div className="flex flex-col gap-md">
                 {data.acoustic.map((m) => (
@@ -475,7 +476,7 @@ export function Results() {
             </div>
 
             {/* Facial Micro-expression Timeline */}
-            <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-2">
+            <div className="rounded-xl panel p-lg lg:col-span-2">
               <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Facial Micro-expression Timeline</h3>
               <div style={{ height: 140 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -495,7 +496,7 @@ export function Results() {
             </div>
 
             {/* Longitudinal Comparison */}
-            <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-3">
+            <div className="rounded-xl panel p-lg lg:col-span-3">
               <div className="mb-md flex items-center justify-between">
                 <h3 className="font-headline-sm text-headline-sm text-on-surface">Longitudinal Comparison (vs. 3 Months Ago)</h3>
                 <div className="flex gap-md">

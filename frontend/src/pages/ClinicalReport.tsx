@@ -23,7 +23,7 @@ export function ClinicalReport() {
   const ragReport = useReportForCurrentSession()
 
   return (
-    <AppShell title="Reports" showSearch searchPlaceholder="Search reports..." bareMain>
+    <AppShell bareMain>
       <div className="flex-1 overflow-y-auto bg-surface-container-lowest p-margin-mobile md:p-margin-desktop">
         {/* Action Bar */}
         <div className="mx-auto mb-lg flex max-w-[900px] items-center justify-between">
@@ -46,7 +46,7 @@ export function ClinicalReport() {
         </div>
 
         {/* The Report Document */}
-        <div className="shadow-level-2 mx-auto mb-2xl max-w-[900px] rounded-xl border border-outline-variant bg-surface-container-lowest p-8 md:p-12">
+        <div className="panel mx-auto mb-2xl max-w-[900px] rounded-xl border border-outline-variant bg-surface-container-lowest p-8 md:p-12">
           {/* Report Header */}
           <div className="mb-xl flex items-start justify-between border-b border-outline-variant pb-xl">
             <div>

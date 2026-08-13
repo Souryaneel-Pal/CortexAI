@@ -526,19 +526,23 @@ class CortexAIPipeline:
         mc = self.heads.classification_head.predict_with_uncertainty(fused, n_passes=20)
         mean_probs = mc["mean_probs"]
 
-        # Ensure max probability (AI confidence) is at least 0.85
-        max_val, max_idx = mean_probs.max(dim=-1)
-        if max_val.item() < 0.85:
-            v_max = max_val.item()
-            scale_factor = 0.15 / (1.0 - v_max + 1e-8)
-            new_probs = mean_probs.clone()
-            for i in range(mean_probs.shape[-1]):
-                if i == max_idx.item():
-                    new_probs[0, i] = 0.85
-                else:
-                    new_probs[0, i] = mean_probs[0, i] * scale_factor
-            mean_probs = new_probs
-
+        # NOTE: there was previously an "AI confidence floor" here that rewrote
+        # `mean_probs` so the top class always read >= 0.85. It is deliberately
+        # gone, and must not come back. Two reasons:
+        #
+        #   1. It fabricated the number. On this dataset the honest MC-dropout
+        #      confidence sits well below 0.85, so the floor fired on virtually
+        #      every request and every assessment reported exactly "85%
+        #      confidence" -- a constant presented to clinicians as a model
+        #      output.
+        #   2. It silently disabled the uncertainty gate, which is the system's
+        #      main safety feature. The gate defers to a human when confidence
+        #      falls below the configured threshold (default 0.60); a hard floor
+        #      at 0.85 means that comparison can never be true, so nothing was
+        #      ever routed for human review.
+        #
+        # If low confidence is undesirable, the fix is a better model or a
+        # tuned threshold in Settings -- not overwriting the output.
         predicted_class = int(mean_probs.argmax(dim=-1).item())
         confidence = float(mean_probs.max(dim=-1).values.item())
 

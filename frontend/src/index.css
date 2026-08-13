@@ -2,6 +2,137 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Colour tokens.
+ *
+ * Every Tailwind colour resolves to one of these variables (see
+ * tailwind.config.ts), so switching theme is a single class on <html> rather
+ * than a `dark:` variant on every element across seven pages. Values are
+ * space-separated RGB channels so Tailwind's `/opacity` modifiers still work.
+ *
+ * The light palette is the original DESIGN.md scale, unchanged. The dark
+ * palette keeps the same three hues (sky / teal / violet) and lifts the
+ * foreground tones so contrast stays legible on dark surfaces.
+ */
+:root {
+  --c-surface: 248 249 255;
+  --c-surface-dim: 226 234 248;
+  --c-surface-bright: 255 255 255;
+  --c-surface-container-lowest: 255 255 255;
+  --c-surface-container-low: 239 244 255;
+  --c-surface-container: 229 238 255;
+  --c-surface-container-high: 220 233 255;
+  --c-surface-container-highest: 211 228 254;
+  --c-surface-variant: 211 228 254;
+  --c-surface-tint: 0 101 145;
+  --c-on-surface: 11 28 48;
+  --c-on-surface-variant: 62 72 80;
+  --c-inverse-surface: 33 49 69;
+  --c-inverse-on-surface: 234 241 255;
+  --c-outline: 110 120 129;
+  --c-outline-variant: 190 200 210;
+  --c-background: 248 249 255;
+  --c-on-background: 11 28 48;
+
+  --c-primary: 0 101 145;
+  --c-on-primary: 255 255 255;
+  --c-primary-container: 14 165 233;
+  --c-on-primary-container: 0 55 81;
+  --c-inverse-primary: 137 206 255;
+  --c-primary-fixed: 201 230 255;
+  --c-primary-fixed-dim: 137 206 255;
+  --c-on-primary-fixed: 0 30 47;
+  --c-on-primary-fixed-variant: 0 76 110;
+
+  --c-secondary: 0 107 95;
+  --c-on-secondary: 255 255 255;
+  --c-secondary-container: 109 245 225;
+  --c-on-secondary-container: 0 111 100;
+  --c-secondary-fixed: 113 248 228;
+  --c-secondary-fixed-dim: 79 219 200;
+  --c-on-secondary-fixed: 0 32 28;
+  --c-on-secondary-fixed-variant: 0 80 72;
+
+  --c-tertiary: 109 59 215;
+  --c-on-tertiary: 255 255 255;
+  --c-tertiary-container: 169 134 255;
+  --c-on-tertiary-container: 62 0 151;
+  --c-tertiary-fixed: 233 221 255;
+  --c-tertiary-fixed-dim: 208 188 255;
+  --c-on-tertiary-fixed: 35 0 92;
+  --c-on-tertiary-fixed-variant: 85 22 190;
+
+  --c-error: 186 26 26;
+  --c-on-error: 255 255 255;
+  --c-error-container: 255 218 214;
+  --c-on-error-container: 147 0 10;
+
+  /* Ambient wash behind the app canvas. */
+  --mesh-1: rgba(14, 165, 233, 0.14);
+  --mesh-2: rgba(109, 59, 215, 0.10);
+  --mesh-3: rgba(0, 107, 95, 0.08);
+  --hairline: rgba(11, 28, 48, 0.06);
+}
+
+.dark {
+  --c-surface: 10 18 32;
+  --c-surface-dim: 6 13 24;
+  --c-surface-bright: 26 37 54;
+  --c-surface-container-lowest: 8 15 27;
+  --c-surface-container-low: 16 25 39;
+  --c-surface-container: 22 32 47;
+  --c-surface-container-high: 31 43 59;
+  --c-surface-container-highest: 42 54 72;
+  --c-surface-variant: 42 54 72;
+  --c-surface-tint: 99 200 255;
+  --c-on-surface: 231 238 248;
+  --c-on-surface-variant: 168 181 196;
+  --c-inverse-surface: 231 238 248;
+  --c-inverse-on-surface: 10 18 32;
+  --c-outline: 125 138 153;
+  --c-outline-variant: 47 60 76;
+  --c-background: 8 14 25;
+  --c-on-background: 231 238 248;
+
+  --c-primary: 99 200 255;
+  --c-on-primary: 0 52 76;
+  --c-primary-container: 14 165 233;
+  --c-on-primary-container: 201 230 255;
+  --c-inverse-primary: 0 101 145;
+  --c-primary-fixed: 201 230 255;
+  --c-primary-fixed-dim: 137 206 255;
+  --c-on-primary-fixed: 0 30 47;
+  --c-on-primary-fixed-variant: 0 76 110;
+
+  --c-secondary: 79 219 200;
+  --c-on-secondary: 0 55 49;
+  --c-secondary-container: 0 80 72;
+  --c-on-secondary-container: 113 248 228;
+  --c-secondary-fixed: 113 248 228;
+  --c-secondary-fixed-dim: 79 219 200;
+  --c-on-secondary-fixed: 0 32 28;
+  --c-on-secondary-fixed-variant: 0 80 72;
+
+  --c-tertiary: 196 167 255;
+  --c-on-tertiary: 62 0 151;
+  --c-tertiary-container: 85 22 190;
+  --c-on-tertiary-container: 233 221 255;
+  --c-tertiary-fixed: 233 221 255;
+  --c-tertiary-fixed-dim: 208 188 255;
+  --c-on-tertiary-fixed: 35 0 92;
+  --c-on-tertiary-fixed-variant: 85 22 190;
+
+  --c-error: 255 180 171;
+  --c-on-error: 105 0 5;
+  --c-error-container: 147 0 10;
+  --c-on-error-container: 255 218 214;
+
+  --mesh-1: rgba(14, 165, 233, 0.20);
+  --mesh-2: rgba(139, 92, 246, 0.18);
+  --mesh-3: rgba(79, 219, 200, 0.10);
+  --hairline: rgba(255, 255, 255, 0.08);
+}
+
 /* Material Symbols Outlined — variable icon font loaded in index.html */
 .material-symbols-outlined {
   font-variation-settings:
@@ -35,6 +166,36 @@
 @layer base {
   body {
     @apply bg-background text-on-background antialiased;
+    /* A soft three-point gradient wash. Fixed so it reads as lighting on the
+       page rather than a texture that scrolls with the content. */
+    background-image:
+      radial-gradient(60rem 60rem at 12% -10%, var(--mesh-1), transparent 60%),
+      radial-gradient(50rem 50rem at 95% 0%, var(--mesh-2), transparent 55%),
+      radial-gradient(45rem 45rem at 60% 110%, var(--mesh-3), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  * {
+    /* Theme switches shouldn't strobe; transition colour only, never layout. */
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease;
+  }
+
+  /* Respect users who ask for less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  ::selection {
+    background: rgb(var(--c-primary-container) / 0.3);
   }
 }
 
@@ -64,5 +225,139 @@
     stroke: theme('colors.outline-variant');
     stroke-width: 1;
     stroke-dasharray: 4;
+  }
+
+  /* ---- Redesign primitives ------------------------------------------- */
+
+  /* Frosted panel: the default surface for nav bars and elevated cards. */
+  .glass {
+    background-color: rgb(var(--c-surface-container-lowest) / 0.72);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+  }
+
+  /* Card with a light top edge, so surfaces read as lit from above. */
+  .panel {
+    background-color: rgb(var(--c-surface-container-lowest) / 0.85);
+    border: 1px solid rgb(var(--c-outline-variant) / 0.7);
+    box-shadow:
+      0 1px 0 0 rgb(255 255 255 / 0.6) inset,
+      0 1px 2px rgba(11, 28, 48, 0.04),
+      0 8px 24px -12px rgba(11, 28, 48, 0.18);
+  }
+
+  .dark .panel {
+    box-shadow:
+      0 1px 0 0 rgb(255 255 255 / 0.05) inset,
+      0 1px 2px rgba(0, 0, 0, 0.4),
+      0 12px 32px -16px rgba(0, 0, 0, 0.7);
+  }
+
+  /* Lift on hover — used on interactive cards and KPI tiles. */
+  .lift {
+    transition:
+      transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 180ms ease;
+    will-change: transform;
+  }
+  .lift:hover {
+    transform: translateY(-3px);
+    box-shadow:
+      0 1px 0 0 rgb(255 255 255 / 0.6) inset,
+      0 18px 40px -18px rgba(11, 28, 48, 0.35);
+  }
+  .dark .lift:hover {
+    box-shadow:
+      0 1px 0 0 rgb(255 255 255 / 0.06) inset,
+      0 20px 44px -20px rgba(0, 0, 0, 0.9);
+  }
+
+  /* Headline treatment: ink at the start, brand hue at the tail. */
+  .headline-gradient {
+    background: linear-gradient(
+      100deg,
+      rgb(var(--c-on-surface)) 0%,
+      rgb(var(--c-on-surface)) 42%,
+      rgb(var(--c-primary-container)) 78%,
+      rgb(var(--c-tertiary)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* Hairline divider that fades at both ends. */
+  .rule-fade {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgb(var(--c-outline-variant)), transparent);
+  }
+
+  /* Faint grid, for hero panels that would otherwise read as flat colour. */
+  .grid-lines {
+    background-image:
+      linear-gradient(var(--hairline) 1px, transparent 1px),
+      linear-gradient(90deg, var(--hairline) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .animate-rise {
+    animation: rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-fade {
+    animation: fade 300ms ease both;
+  }
+
+  /* Slow drift on the hero's ambient blobs. */
+  .animate-drift {
+    animation: drift 14s ease-in-out infinite alternate;
+  }
+
+  /* Breathing dot for "system live" indicators. */
+  .animate-pulse-dot {
+    animation: pulse-dot 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(18px, -14px, 0) scale(1.08);
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  50% {
+    opacity: 0.75;
+    box-shadow: 0 0 0 5px transparent;
   }
 }

@@ -4,6 +4,12 @@ modality: facial
 
 data:
   root: data/raw/Extracted_images
+  # "ferplus" uses Microsoft's FER+ re-annotation of the SAME images (joined on
+  # the FER2013 row index in each filename). FER+ disagrees with the original
+  # label on ~38% of the training set, so this is a label-quality upgrade with
+  # no new images. "folders" keeps the original FER2013 annotation.
+  label_source: ferplus
+  ferplus_csv: data/raw/ferplus/fer2013new.csv
   image_size: 48
   num_classes: 7
   batch_size: 64

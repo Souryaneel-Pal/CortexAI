@@ -22,6 +22,7 @@ and test so metrics are measured on untouched data.
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -51,8 +52,15 @@ from src.data.schemas import (
 
 # Canonical dataset locations (the paths the archive actually uses).
 DEFAULT_FACIAL_ROOT = "data/raw/Extracted_images"
+# FER+ (Microsoft) re-annotates the *same* FER2013 images with 10 crowd votes
+# each. Download once with:
+#   curl -L -o data/raw/ferplus/fer2013new.csv \
+#     https://raw.githubusercontent.com/microsoft/FERPlus/master/fer2013new.csv
+DEFAULT_FERPLUS_CSV = "data/raw/ferplus/fer2013new.csv"
 DEFAULT_SPEECH_ROOT = "data/raw/Audios"
 DEFAULT_TABULAR_CSV = "data/raw/mental_health_multimodal.csv"
+
+logger = logging.getLogger(__name__)
 
 FACIAL_EMOTION_NAME_TO_IDX = {name: idx for idx, name in FACIAL_EMOTIONS.items()}
 SPEECH_EMOTION_NAME_TO_IDX = {name: idx for idx, name in enumerate(SPEECH_EMOTIONS.values())}
@@ -68,6 +76,72 @@ def _require_path(path: Path, hint: str) -> Path:
             "`python -m src.data.validate_datasets`."
         )
     return path
+
+
+# FER+ vote columns, in the CSV's own order.
+FERPLUS_VOTE_COLUMNS = (
+    "neutral", "happiness", "surprise", "sadness", "anger",
+    "disgust", "fear", "contempt", "unknown", "NF",
+)
+
+# FER+ emotion name -> this project's FER class name. `contempt` has no
+# counterpart in the 7-class schema the emotion->stress bridge is built on
+# (src/data/emotion_stress_map.py), and `unknown`/`NF` ("not a face") are not
+# emotions at all, so images whose majority vote lands on any of the three are
+# excluded rather than force-fitted into a class they do not belong to.
+FERPLUS_TO_FACIAL_CLASS = {
+    "neutral": "Neutral",
+    "happiness": "Happy",
+    "surprise": "Surprise",
+    "sadness": "Sad",
+    "anger": "Angry",
+    "disgust": "Disgust",
+    "fear": "Fear",
+}
+FERPLUS_EXCLUDED = ("contempt", "unknown", "NF")
+
+
+def load_ferplus_labels(
+    ferplus_csv: str | Path = DEFAULT_FERPLUS_CSV,
+    usage: str = "Training",
+    min_vote_fraction: float = 0.0,
+) -> dict[int, int]:
+    """Map FER2013 row index -> facial class index, using FER+ majority vote.
+
+    FER+ rows are aligned to `fer2013.csv` row order, and the images in
+    `data/raw/Extracted_images/` are named by that same row index (verified:
+    28,709 files, indices 0..28708 with no gaps), so the two join on the
+    filename with no image processing at all.
+
+    Only rows whose `Usage` is `usage` are considered -- FER+ covers all 35,887
+    FER2013 rows, but the extracted folders contain just the 28,709 Training
+    ones, and silently mixing in PublicTest rows would shift every index.
+
+    `min_vote_fraction` optionally drops ambiguous images: with 10 annotators,
+    0.5 keeps only images where at least half agreed. Left at 0 by default so
+    the switch changes labels and nothing else.
+    """
+    import pandas as pd
+
+    path = _require_path(Path(ferplus_csv), "FER+ label CSV")
+    frame = pd.read_csv(path)
+    frame = frame[frame["Usage"] == usage].reset_index(drop=True)
+
+    votes = frame[list(FERPLUS_VOTE_COLUMNS)].to_numpy(dtype=np.float32)
+    winners = votes.argmax(axis=1)
+    totals = votes.sum(axis=1)
+
+    labels: dict[int, int] = {}
+    for row_index, winner in enumerate(winners):
+        emotion = FERPLUS_VOTE_COLUMNS[winner]
+        if emotion in FERPLUS_EXCLUDED:
+            continue
+        if min_vote_fraction > 0.0:
+            total = totals[row_index]
+            if total <= 0 or votes[row_index, winner] / total < min_vote_fraction:
+                continue
+        labels[row_index] = FACIAL_EMOTION_NAME_TO_IDX[FERPLUS_TO_FACIAL_CLASS[emotion]]
+    return labels
 
 
 class FacialEmotionDataset(Dataset):
@@ -89,11 +163,26 @@ class FacialEmotionDataset(Dataset):
         root: str | Path = DEFAULT_FACIAL_ROOT,
         transform=None,
         train: bool = False,
+        label_source: str = "folders",
+        ferplus_csv: str | Path = DEFAULT_FERPLUS_CSV,
+        min_vote_fraction: float = 0.0,
     ):
+        """`label_source`:
+          - "folders" -- the original FER2013 label, i.e. which directory the
+            image sits in.
+          - "ferplus" -- the FER+ majority vote for the same image, joined on
+            the filename's FER2013 row index. The images are identical; only
+            the labels change. FER+ disagrees with the original annotation on
+            ~38% of the training set, which is the label noise FER2013 is known
+            for, so this is a straight quality upgrade with no new data.
+        """
         self.root = Path(root)
         self.train = train
+        self.label_source = label_source
         self.samples: list[tuple] = []  # (image_source, label_idx)
         self._mode: str
+        self._ferplus_relabelled = 0
+        self._ferplus_excluded = 0
 
         csv_path = self.root / "fer2013.csv"
         if csv_path.exists():
@@ -104,14 +193,46 @@ class FacialEmotionDataset(Dataset):
         else:
             _require_path(self.root, "Facial dataset root")
             self._mode = "folders"
+
+            ferplus_labels: dict[int, int] | None = None
+            if label_source == "ferplus":
+                ferplus_labels = load_ferplus_labels(ferplus_csv, min_vote_fraction=min_vote_fraction)
+
             for emotion_name, label_idx in FACIAL_EMOTION_NAME_TO_IDX.items():
                 class_dir = self.root / emotion_name
                 if not class_dir.exists():
                     continue
                 for img_path in sorted(class_dir.glob("*")):
-                    if img_path.suffix.lower() in _IMAGE_SUFFIXES:
+                    if img_path.suffix.lower() not in _IMAGE_SUFFIXES:
+                        continue
+                    if ferplus_labels is None:
                         self.samples.append((img_path, label_idx))
+                        continue
+
+                    # Join on the FER2013 row index encoded in the filename.
+                    if not img_path.stem.isdigit():
+                        self._ferplus_excluded += 1
+                        continue
+                    relabelled = ferplus_labels.get(int(img_path.stem))
+                    if relabelled is None:
+                        # Majority vote was contempt / unknown / not-a-face, or
+                        # below the agreement floor.
+                        self._ferplus_excluded += 1
+                        continue
+                    if relabelled != label_idx:
+                        self._ferplus_relabelled += 1
+                    self.samples.append((img_path, relabelled))
             if not self.samples:
+                if self._ferplus_excluded:
+                    # Images *are* on disk; the FER+ join dropped all of them.
+                    # Saying "no images found" here would send someone to
+                    # re-download a dataset they already have.
+                    raise ValueError(
+                        f"Found {self._ferplus_excluded} image(s) under {self.root} but FER+ labelling "
+                        f"excluded every one. FER+ joins on the FER2013 row index encoded in each "
+                        f"filename (e.g. '10018.png'), so a corpus with non-numeric filenames cannot "
+                        f"be matched. Use label_source='folders', or supply the index-named images."
+                    )
                 raise FileNotFoundError(
                     f"No facial images found under {self.root}/<EmotionName>/ and no "
                     f"fer2013.csv present. See README.md 'Dataset Access'."
@@ -123,6 +244,14 @@ class FacialEmotionDataset(Dataset):
         self._majority_transform = facial_train_transform() if train else None
         self._minority_transform = facial_minority_transform() if train else None
         self._eval_transform = facial_eval_transform() if not train else None
+        if label_source == "ferplus":
+            logger.info(
+                "FER+ labels: %d images (%d relabelled, %d excluded as contempt/unknown/not-a-face)",
+                len(self.samples),
+                self._ferplus_relabelled,
+                self._ferplus_excluded,
+            )
+
         self._minority_label_indices = {
             FACIAL_EMOTION_NAME_TO_IDX[name]
             for name in FACIAL_MINORITY_CLASSES

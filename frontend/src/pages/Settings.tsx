@@ -71,19 +71,14 @@ export function Settings() {
   }
 
   return (
-    <AppShell>
-      <div className="flex flex-col gap-xs mb-xl">
-        <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
-          Clinical Settings Control Panel
-        </h1>
-        <p className="max-w-2xl font-body-md text-body-md text-on-surface-variant">
-          Calibrate distress indexing sensitivity, uncertainty deferrals, and sensor stream masking parameters.
-        </p>
-      </div>
-
+    <AppShell
+      eyebrow="Administrator"
+      title="Model Control Panel"
+      subtitle="Calibrate distress-index sensitivity, uncertainty deferral, and sensor-stream masking. Changes take effect on the next assessment — no restart."
+    >
       <div className="grid grid-cols-1 gap-lg lg:grid-cols-3">
         {/* Sliders Card */}
-        <section className="flex flex-col gap-lg rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-level-1 lg:col-span-2">
+        <section className="flex flex-col gap-lg rounded-xl panel p-lg lg:col-span-2">
           <div>
             <h2 className="mb-xs font-headline-sm text-headline-sm text-on-surface">Clinical Decision Guardrails</h2>
             <p className="font-body-sm text-body-sm text-on-surface-variant">
@@ -153,7 +148,7 @@ export function Settings() {
         </section>
 
         {/* Toggles Card */}
-        <section className="flex flex-col gap-lg rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-level-1 lg:col-span-1">
+        <section className="flex flex-col gap-lg rounded-xl panel p-lg lg:col-span-1">
           <div>
             <h2 className="mb-xs font-headline-sm text-headline-sm text-on-surface">Sensor Modality Masking</h2>
             <p className="font-body-sm text-body-sm text-on-surface-variant">

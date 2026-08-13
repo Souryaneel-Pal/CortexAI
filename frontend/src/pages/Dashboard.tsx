@@ -135,7 +135,7 @@ export function Dashboard() {
       {/* Latest live assessment — real backend values, shown only when a
           session exists so it can never be confused with the sample cohort. */}
       {prediction && (
-        <section className="mb-xl rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-level-1">
+        <section className="mb-xl rounded-xl panel p-lg">
           <div className="mb-md flex flex-wrap items-center justify-between gap-sm">
             <h3 className="font-headline-sm text-headline-sm text-on-surface">Latest Assessment</h3>
             <div className="flex items-center gap-sm">
@@ -211,43 +211,75 @@ export function Dashboard() {
       )}
 
       {/* Hero */}
-      <section className="relative mb-xl flex flex-col gap-lg overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-level-1 md:flex-row md:items-end md:justify-between">
-        <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 -translate-y-1/2 translate-x-1/4 rounded-full bg-gradient-to-br from-tertiary/10 to-transparent blur-3xl" />
-        <div className="relative z-10 max-w-3xl">
-          <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-sm">
-            Clinical Distress Screening Panel
-          </h2>
-          <p className="font-body-lg text-body-lg text-on-surface-variant">
-            Decision-support system integrating behavioral, physiological, and audio-visual metrics to screen for mental distress levels.
-          </p>
-        </div>
-        <div className="relative z-10 shrink-0">
-          <Link
-            to="/assessment/new"
-            className="flex items-center gap-2 rounded-lg bg-primary px-6 py-3 font-label-md text-label-md text-on-primary shadow-level-1 transition-colors hover:bg-on-primary-fixed-variant"
-          >
-            <MaterialIcon name="add" className="text-[20px]" />
-            Start New Assessment
-          </Link>
+      <section className="panel grid-lines relative mb-xl overflow-hidden rounded-xl p-lg md:p-xl">
+        {/* Ambient light sources. Drifting slowly keeps the panel from reading
+            as a static block without ever moving the content underneath. */}
+        <div className="animate-drift pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-gradient-to-br from-tertiary/25 to-transparent blur-3xl" />
+        <div className="animate-drift pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-gradient-to-tr from-primary-container/25 to-transparent blur-3xl" />
+
+        <div className="relative z-10 flex flex-col gap-lg md:flex-row md:items-end md:justify-between">
+          <div className="max-w-3xl">
+            <p className="mb-sm flex items-center gap-xs font-label-sm text-label-sm uppercase tracking-[0.18em] text-primary">
+              <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-primary text-primary" />
+              Multimodal screening console
+            </p>
+            <h2 className="headline-gradient font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg">
+              Clinical Distress Screening Panel
+            </h2>
+            <p className="mt-sm font-body-lg text-body-lg leading-relaxed text-on-surface-variant">
+              Face, voice and physiological signals fused into one explainable assessment — every score traceable to the
+              evidence behind it.
+            </p>
+
+            <div className="mt-lg flex flex-wrap items-center gap-xs">
+              {['Grad-CAM', 'SHAP', 'Masked-Distress Index', 'Cited RAG report'].map((chip) => (
+                <span
+                  key={chip}
+                  className="rounded-full border border-outline-variant/70 bg-surface-container-lowest/60 px-sm py-1 font-label-sm text-label-sm text-on-surface-variant"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="shrink-0">
+            <Link
+              to="/assessment/new"
+              className="group flex items-center gap-sm rounded-lg bg-primary px-lg py-md font-label-md text-label-md text-on-primary shadow-level-2 transition-all hover:-translate-y-0.5 hover:shadow-ai-glow"
+            >
+              <MaterialIcon name="add" className="text-[20px]" />
+              Start New Assessment
+              <MaterialIcon
+                name="arrow_forward"
+                className="text-[18px] transition-transform group-hover:translate-x-0.5"
+              />
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* KPI Cards Row */}
       <section className="mb-xl grid grid-cols-2 gap-md md:grid-cols-5">
-        {data.heroStats.map((stat) => (
+        {data.heroStats.map((stat, i) => (
           <div
             key={stat.label}
-            className={`flex flex-col rounded-lg border border-outline-variant bg-surface-container-lowest p-md shadow-level-1 ${
+            style={{ animationDelay: `${i * 45}ms` }}
+            className={`panel lift animate-rise relative flex flex-col overflow-hidden rounded-lg p-md ${
               stat.accentClassName ? `border-l-4 ${stat.accentClassName}` : ''
             }`}
           >
-            <span className="mb-2 font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
+            <span className="mb-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
               {stat.label}
             </span>
-            <span className="font-headline-md text-headline-md text-on-surface">{stat.value}</span>
-            <div className="mt-2 flex items-center gap-1 text-sm text-outline">
-              {stat.label === 'Total Assessments' && <MaterialIcon name="trending_up" className="text-[16px] text-secondary" />}
-              <span className="font-label-sm text-label-sm">{stat.meta}</span>
+            {/* Tabular figures so the row of numbers aligns on the decimal
+                rather than jittering as counts change. */}
+            <span className="font-headline-md text-headline-md tabular-nums text-on-surface">{stat.value}</span>
+            <div className="mt-xs flex items-center gap-1">
+              {stat.label === 'Total Assessments' && (
+                <MaterialIcon name="trending_up" className="text-[16px] text-secondary" />
+              )}
+              <span className="font-label-sm text-label-sm text-on-surface-variant">{stat.meta}</span>
             </div>
           </div>
         ))}
@@ -256,7 +288,7 @@ export function Dashboard() {
       {/* Main Data Grid */}
       <section className="mb-xl grid grid-cols-1 gap-lg lg:grid-cols-3">
         {/* Stress Distribution Donut */}
-        <div className="col-span-1 flex flex-col rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-level-1">
+        <div className="col-span-1 flex flex-col rounded-xl panel p-lg">
           <div className="mb-md flex items-center justify-between">
             <h3 className="font-headline-sm text-headline-sm text-on-surface">Distress Classification Distribution</h3>
             <SampleDataBadge />
@@ -301,7 +333,7 @@ export function Dashboard() {
         </div>
 
         {/* Monthly Assessment Trend */}
-        <div className="col-span-1 flex flex-col rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-level-1 lg:col-span-2">
+        <div className="col-span-1 flex flex-col rounded-xl panel p-lg lg:col-span-2">
           <div className="mb-md flex items-center justify-between">
             <h3 className="font-headline-sm text-headline-sm text-on-surface">Monthly Assessment Volumetrics</h3>
             <div className="flex items-center gap-sm">
@@ -351,7 +383,7 @@ export function Dashboard() {
       </section>
 
       {/* Recent Assessments Table */}
-      <section className="mb-xl overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-level-1">
+      <section className="mb-xl overflow-hidden rounded-xl panel">
         <div className="flex items-center justify-between border-b border-outline-variant bg-surface-container-low p-lg">
           <h3 className="font-headline-sm text-headline-sm text-on-surface">Recent Patient Screenings</h3>
           <button type="button" className="font-label-sm text-label-sm text-primary hover:underline">
