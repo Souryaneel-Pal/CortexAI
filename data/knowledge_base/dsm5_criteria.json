@@ -1,0 +1,38 @@
+[
+  {
+    "id": "dsm5-domain-sleep",
+    "text": "Sleep disruption -- difficulty falling asleep, staying asleep, or non-restorative sleep -- is a commonly observed symptom domain across stress-related and depressive presentations, and is frequently used as a screening indicator alongside self-reported sleep quality.",
+    "source": "Placeholder paraphrase (not verbatim DSM-5 text) -- see data/knowledge_base/README.md",
+    "category": "symptom_domain"
+  },
+  {
+    "id": "dsm5-domain-anhedonia",
+    "text": "Markedly diminished interest or pleasure in activities previously found enjoyable, and reduced social engagement, are core symptom domains associated with depressive presentations.",
+    "source": "Placeholder paraphrase (not verbatim DSM-5 text) -- see data/knowledge_base/README.md",
+    "category": "symptom_domain"
+  },
+  {
+    "id": "dsm5-domain-autonomic-arousal",
+    "text": "Elevated autonomic arousal -- increased heart rate, reduced heart-rate variability, elevated galvanic skin response -- is a physiological correlate frequently associated with anxiety and acute stress states.",
+    "source": "Placeholder paraphrase (not verbatim DSM-5 text) -- see data/knowledge_base/README.md",
+    "category": "symptom_domain"
+  },
+  {
+    "id": "dsm5-domain-psychomotor",
+    "text": "Observable psychomotor changes -- altered speech rate, reduced facial expressivity, or restlessness -- are frequently noted symptom domains in both anxiety and depressive presentations and can be picked up by behavioral/acoustic/facial screening signals.",
+    "source": "Placeholder paraphrase (not verbatim DSM-5 text) -- see data/knowledge_base/README.md",
+    "category": "symptom_domain"
+  },
+  {
+    "id": "dsm5-domain-cognitive",
+    "text": "Difficulty concentrating and indecisiveness are commonly reported cognitive symptom domains that can co-occur with elevated stress, anxiety, or depressive symptom burden.",
+    "source": "Placeholder paraphrase (not verbatim DSM-5 text) -- see data/knowledge_base/README.md",
+    "category": "symptom_domain"
+  },
+  {
+    "id": "dsm5-screening-vs-diagnosis",
+    "text": "Symptom screening instruments and automated behavioral/physiological indicators can flag elevated risk, but a categorical diagnosis requires clinical interview, longitudinal history, and differential diagnosis by a qualified professional -- screening output should never be presented as a diagnosis.",
+    "source": "Placeholder paraphrase -- general clinical-practice framing, see data/knowledge_base/README.md",
+    "category": "responsible_ai"
+  }
+]

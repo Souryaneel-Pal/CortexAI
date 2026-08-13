@@ -203,24 +203,39 @@ breaking API change.
 
 ## P4 — RAG clinical layer + agent orchestrator + safety
 
-- [ ] `data/knowledge_base/` — curated/stubbed clinical reference text (DSM-5 criteria
-      excerpts, DASS-21 interpretation bands, WHO guidance). **Not in `./docs`, so this is
-      sourced/stubbed and clearly marked as placeholder content requiring a real clinical KB
-      review before any real-world use** — per explicit instruction.
-- [ ] `src/reasoning/retriever.py` — FAISS (or Chroma) index + sentence-transformers
-      embeddings over the KB
-- [ ] `src/reasoning/rag_report.py` — cited, grounded narrative report generation (Claude
-      API). Every clinical claim traces to a retrieved source — never an unsourced claim.
-- [ ] `src/reasoning/agent_graph.py` — thin orchestrator (LangGraph or simple state machine):
-      preprocess → predict → uncertainty-gate → explain → retrieve → report, handles
-      follow-ups ("why moderate?"). Coordinates only — never makes the clinical call.
-- [ ] Crisis/helpline resource surfacing wired in wherever severe-distress indicators
-      co-occur, and decision-support (not diagnosis) framing wired into every report/API
-      response/UI copy string — non-negotiable, checked in P6 hardening pass too
+- [x] `data/knowledge_base/` — curated/stubbed clinical reference text (DSM-5 criteria
+      excerpts, DASS-21 interpretation bands, WHO guidance, crisis resources). **Not in
+      `./docs`, so this is sourced/stubbed and clearly marked as placeholder content
+      requiring a real clinical KB review before any real-world use** — see
+      `data/knowledge_base/README.md` for the full per-file disclosure. 19 entries.
+- [x] `src/reasoning/retriever.py` — FAISS + sentence-transformers embeddings (primary) with
+      automatic TF-IDF fallback (scikit-learn, no model download) when the sentence-
+      transformers model can't be fetched — verified: HF Hub is unreachable from this
+      sandbox (same restriction as wav2vec2), so the fallback path is what's actually
+      exercised and tested here; the primary path activates wherever HF Hub access exists.
+- [x] `src/reasoning/rag_report.py` — cited, grounded narrative report generation (Claude
+      API, injectable client for testing). Every clinical claim traces to a retrieved
+      source; `validate_citations` mechanically rejects fabricated `[doc-id]` markers and
+      falls back to the always-valid cached report rather than surfacing an unsourced claim
+      — verified with a fake LLM client returning both valid and hallucinated citations.
+- [x] `src/reasoning/agent_graph.py` — thin LangGraph orchestrator: preprocess → predict →
+      uncertainty-gate → explain → retrieve → report, plus `answer_follow_up` for
+      interactive questions ("why moderate?") that reuses the existing prediction rather
+      than re-predicting. Coordinates only — never overrides the model's call. Verified
+      end-to-end against the real knowledge base with fake model-stage functions.
+- [x] Crisis/helpline resource surfacing wired in wherever severe-distress indicators
+      co-occur (predicted-Severe class OR high Masked-Distress Index) — the agent graph's
+      `retrieve` node force-attaches crisis-resource documents via direct category lookup
+      rather than leaving it to similarity-search ranking chance; verified both trigger
+      paths independently. Decision-support (not diagnosis) framing is baked into both the
+      live-LLM system prompt and the cached-report template — checked again in P6.
 
-**If blocked:** if live LLM calls aren't available/affordable during iteration, fall back
-to pre-generated cached reports for the demo fixtures, clearly labeled as cached — never
-silently fake a live call.
+**If blocked:** no ANTHROPIC_API_KEY in this sandbox → the live-LLM path (prompt
+construction, citation validation, hallucination fallback) is verified with an injected
+fake client; the cached-report fallback (docs/MINDSCOPE_Blueprint.pdf's documented "live
+RAG → pre-generated cached reports" fallback) is what's actually exercised end-to-end and
+is what the agent graph produces by default in this environment, always clearly labeled
+`cached=True` rather than silently presented as a live report.
 
 ---
 

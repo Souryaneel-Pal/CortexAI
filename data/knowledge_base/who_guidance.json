@@ -1,0 +1,26 @@
+[
+  {
+    "id": "who-screening-not-diagnosis",
+    "text": "Mental health screening tools are intended to identify individuals who may benefit from further assessment by a qualified professional; a screening result, however produced, is not equivalent to a clinical diagnosis.",
+    "source": "Placeholder paraphrase in the spirit of general WHO mental-health communications -- not a verbatim WHO publication excerpt, see data/knowledge_base/README.md",
+    "category": "responsible_ai"
+  },
+  {
+    "id": "who-early-support",
+    "text": "Early identification of elevated stress, anxiety, or depressive symptoms, followed by timely connection to appropriate support, is associated with better outcomes than delayed engagement.",
+    "source": "Placeholder paraphrase in the spirit of general WHO mental-health communications -- not a verbatim WHO publication excerpt, see data/knowledge_base/README.md",
+    "category": "general_guidance"
+  },
+  {
+    "id": "who-stigma-reduction",
+    "text": "Communicating mental-health information in non-stigmatizing, supportive language -- framing results as information that supports a person's wellbeing rather than a label -- improves the likelihood that individuals seek appropriate care.",
+    "source": "Placeholder paraphrase in the spirit of general WHO mental-health communications -- not a verbatim WHO publication excerpt, see data/knowledge_base/README.md",
+    "category": "responsible_ai"
+  },
+  {
+    "id": "who-holistic-wellbeing",
+    "text": "Sleep quality, social engagement, and physical activity are commonly cited modifiable factors associated with mental wellbeing, and are frequently included in low-burden self-management guidance alongside professional support.",
+    "source": "Placeholder paraphrase in the spirit of general WHO mental-health communications -- not a verbatim WHO publication excerpt, see data/knowledge_base/README.md",
+    "category": "general_guidance"
+  }
+]
