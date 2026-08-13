@@ -1,0 +1,59 @@
+stages:
+  validate_data:
+    cmd: python -m src.data.validate_datasets
+    deps:
+      - src/data/validate_datasets.py
+      - src/data/schemas.py
+      - data/raw
+
+  train_face:
+    cmd: python -m src.train.train_modality --config configs/face.yaml
+    deps:
+      - src/train/train_modality.py
+      - src/models/face_cnn.py
+      - configs/face.yaml
+      - data/raw/facial
+    outs:
+      - artifacts/checkpoints/face
+
+  train_speech:
+    cmd: python -m src.train.train_modality --config configs/speech.yaml
+    deps:
+      - src/train/train_modality.py
+      - src/models/speech_net.py
+      - configs/speech.yaml
+      - data/raw/speech
+    outs:
+      - artifacts/checkpoints/speech
+
+  train_tabular:
+    cmd: python -m src.train.train_modality --config configs/tabular.yaml
+    deps:
+      - src/train/train_modality.py
+      - src/models/tabular_ft.py
+      - configs/tabular.yaml
+      - data/raw/numerical.csv
+    outs:
+      - artifacts/checkpoints/tabular
+
+  train_fusion:
+    cmd: python -m src.train.train_fusion --config configs/fusion.yaml
+    deps:
+      - src/train/train_fusion.py
+      - src/models/fusion.py
+      - src/models/heads.py
+      - configs/fusion.yaml
+      - artifacts/checkpoints/face
+      - artifacts/checkpoints/speech
+      - artifacts/checkpoints/tabular
+    outs:
+      - artifacts/checkpoints/fusion
+
+  evaluate:
+    cmd: python -m src.eval.ablation --config configs/fusion.yaml
+    deps:
+      - src/eval/ablation.py
+      - src/eval/metrics.py
+      - artifacts/checkpoints/fusion
+    outs:
+      - artifacts/reports/ablation.json
