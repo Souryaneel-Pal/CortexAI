@@ -241,28 +241,42 @@ is what the agent graph produces by default in this environment, always clearly 
 
 ## P5 — Frontend + API integration
 
-- [ ] Extract `DESIGN.md` tokens into `frontend/tailwind.config.ts` exactly (colors,
-      Inter + JetBrains Mono, 8px spacing scale, radii, elevation)
-- [ ] Scaffold `frontend/` (Vite + React + TS + Tailwind), Material Symbols + the two Google
-      Fonts loaded as in the originals
-- [ ] Convert each of the six `docs/frontend_design/*/code.html` pages into a route/page
-      component, 1:1 on layout/color/spacing/copy — **no redesign**:
-      Dashboard, New AI Assessment, Explainable AI Insights (+ expanded variant),
+- [x] Extract `DESIGN.md` tokens into `frontend/tailwind.config.ts` exactly (colors,
+      Inter + JetBrains Mono, 8px spacing scale, radii, elevation) — spot-checked hex
+      values against DESIGN.md directly, match exactly
+- [x] Scaffold `frontend/` (Vite + React 18 + TS + Tailwind), Material Symbols + the two
+      Google Fonts loaded the same way the source `code.html` files load them
+- [x] Convert each of the six `docs/frontend_design/*/code.html` pages into a route/page
+      component, 1:1 on layout/color/spacing/copy — **no redesign**: Dashboard,
+      New AI Assessment, Explainable AI Insights (expanded variant implemented as an
+      in-page `expanded` state, not a separate route, after diffing the two source HTML
+      files and finding the expanded version only appends 3 sections + swaps one column),
       Clinical Report, Population Analytics
-- [ ] Extract repeated header/sidebar markup into shared layout components
-- [ ] Replace every "MindScope" occurrence with "CortexAI" (branding, page titles, copy,
-      generated docs) — design tokens/colors/architecture untouched
-- [ ] Wire real charts (Recharts) in place of static mockup content; merge useful
-      interaction patterns from `MindScope_UI_Template.jsx` where they fit the Stitch layout
-- [ ] `src/api/` — FastAPI (`main.py`, `schemas.py`, `inference.py`): `/predict`, `/explain`,
-      `/report`, session endpoints; responses carry the decision-support framing and
-      uncertainty-gate result
-- [ ] Wire frontend → API for real predictions/explanations/reports (falling back to the
-      documented mock data only where no backend result exists yet)
+- [x] Extract repeated header/sidebar markup into shared layout components
+      (`frontend/src/components/layout/`)
+- [x] Replace every "MindScope" occurrence with "CortexAI" (branding, page titles, copy) —
+      verified via grep: zero user-visible leftovers, only one code comment referencing the
+      source reference-file's name
+- [x] Wire real charts (Recharts) in place of static mockup content; merged the
+      responsible-AI copy pattern from `MindScope_UI_Template.jsx` (the six approved Stitch
+      pages carried none themselves, and P4/P6 require it non-negotiably) — sidebar
+      disclaimer, Clinical Report footer, and a `CrisisResourcesCard` surfaced on
+      severe-flagged results, flagged as the one place content was added beyond a literal
+      1:1 conversion
+- [x] `src/api/` — FastAPI (`main.py`, `schemas.py`, `inference.py`): `/assess`,
+      `/explain/{id}`, `/counterfactual/{id}`, `/report/{id}`, `/follow-up`, `/health`;
+      every prediction-carrying response includes the decision-support disclaimer and
+      uncertainty-gate result, and flags `is_demo_untrained_model` when (as in this sandbox)
+      no trained checkpoint is loaded, rather than presenting untrained-model output as real
+- [ ] Wire frontend → real API (currently the frontend's typed mock-data layer,
+      `frontend/src/lib/mockData.ts`, stands in — shaped to match the API's actual response
+      schemas so swapping is a data-source change, not a restructuring) — next step
 - [ ] `src/eval/fairness_audit.py` — subgroup metrics by RAVDESS actor gender metadata
 
 **If blocked:** if React wiring runs long, Streamlit is the documented fallback UI —
-called out explicitly rather than silently dropping frontend scope.
+not needed; React conversion completed and verified (`npm run build` clean, dev server
+boots and all 5 routes render with zero runtime errors, per the conversion agent's report,
+independently re-verified: build re-run here, dev server curled directly).
 
 ---
 
