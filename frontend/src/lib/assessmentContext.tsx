@@ -30,6 +30,7 @@ import {
   type TabularFeatures,
 } from './api'
 import { clearAssessment, loadAssessment, saveAssessment, type StoredAssessment } from './sessionStore'
+import { AudioDecodeError, decodeToWav16kMonoBase64 } from './audio'
 
 export interface RunAssessmentInput {
   tabularFeatures: TabularFeatures
@@ -117,9 +118,15 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
     setError(null)
     setReport(null)
     try {
+      // The face image goes up as-is (Pillow reads every common format), but
+      // audio is decoded and re-encoded to 16 kHz mono WAV in the browser.
+      // The server can only read what libsndfile supports, which excludes
+      // M4A/AAC/WEBM -- the formats Voice Memos and MediaRecorder produce.
+      // Converting here means any browser-playable clip works without an
+      // FFmpeg install on the server. See lib/audio.ts.
       const [faceBase64, speechBase64] = await Promise.all([
         input.faceFile ? fileToBase64(input.faceFile) : Promise.resolve(null),
-        input.speechFile ? fileToBase64(input.speechFile) : Promise.resolve(null),
+        input.speechFile ? decodeToWav16kMonoBase64(input.speechFile) : Promise.resolve(null),
       ])
 
       setPhase('predicting')
@@ -156,7 +163,11 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
       setPhase('done')
       return prediction
     } catch (assessError) {
-      setError(toMessage(assessError))
+      // A clip the browser itself cannot decode is a user-fixable problem, so
+      // it gets its own message instead of a generic request failure.
+      setError(
+        assessError instanceof AudioDecodeError ? assessError.message : toMessage(assessError),
+      )
       setPhase('error')
       return null
     }

@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppShell } from '../components/layout/AppShell'
 import { MaterialIcon } from '../components/ui/MaterialIcon'
+import { CameraCapture } from '../components/ui/CameraCapture'
 import { useAssessment } from '../lib/assessmentContext'
 import { FEATURE_MEDIANS } from '../lib/api'
 import type { AssessmentDraft } from '../types'
@@ -27,6 +28,26 @@ export function NewAssessment() {
   const faceInputRef = useRef<HTMLInputElement>(null)
   const speechInputRef = useRef<HTMLInputElement>(null)
 
+  // Both upload cards advertise "or drag it here", so drag-and-drop has to
+  // actually work. Without an onDrop handler the browser's default action is
+  // to *navigate away* to the dropped file, which reads as the app breaking.
+  const [dragTarget, setDragTarget] = useState<'face' | 'speech' | null>(null)
+  const [dropError, setDropError] = useState<string | null>(null)
+  const [cameraOpen, setCameraOpen] = useState(false)
+
+  // Object URL for the selected/captured face, so the clinician can confirm
+  // what they are about to submit. Revoked on change to avoid leaking blobs.
+  const [facePreview, setFacePreview] = useState<string | null>(null)
+  useEffect(() => {
+    if (!faceFile) {
+      setFacePreview(null)
+      return
+    }
+    const url = URL.createObjectURL(faceFile)
+    setFacePreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [faceFile])
+
   const faceCaptured = faceFile !== null
   const speechCaptured = speechFile !== null
   const modelsReady = backendReachable === true
@@ -34,6 +55,50 @@ export function NewAssessment() {
 
   function update<K extends keyof AssessmentDraft>(key: K, value: number | '') {
     setDraft((d) => ({ ...d, [key]: value }))
+  }
+
+  /** Accept a file only into the zone it belongs in, so dropping a photo on
+   *  the voice card explains itself instead of silently doing nothing. */
+  function acceptDroppedFile(kind: 'face' | 'speech', file: File | undefined) {
+    setDragTarget(null)
+    if (!file) return
+
+    const isImage = file.type.startsWith('image/')
+    // Some browsers report an empty MIME type for .wav/.m4a, so fall back to
+    // the extension rather than rejecting a perfectly good clip.
+    const isAudio =
+      file.type.startsWith('audio/') || /\.(wav|mp3|m4a|flac|ogg|aac|aiff?)$/i.test(file.name)
+
+    if (kind === 'face') {
+      if (!isImage) {
+        setDropError(`"${file.name}" is not an image. Drop it on the Voice card if it is a recording.`)
+        return
+      }
+      setDropError(null)
+      setFaceFile(file)
+      return
+    }
+
+    if (!isAudio) {
+      setDropError(`"${file.name}" is not an audio file. Drop it on the Facial card if it is a photo.`)
+      return
+    }
+    setDropError(null)
+    setSpeechFile(file)
+  }
+
+  function dropZoneProps(kind: 'face' | 'speech') {
+    return {
+      onDragOver: (e: React.DragEvent) => {
+        e.preventDefault() // required, or the browser opens the file instead
+        setDragTarget(kind)
+      },
+      onDragLeave: () => setDragTarget((current) => (current === kind ? null : current)),
+      onDrop: (e: React.DragEvent) => {
+        e.preventDefault()
+        acceptDroppedFile(kind, e.dataTransfer.files?.[0])
+      },
+    }
   }
 
   async function handleRunAssessment() {
@@ -117,7 +182,8 @@ export function NewAssessment() {
               <h2 className="font-headline-sm text-headline-sm text-on-surface">Facial Feature Upload</h2>
             </div>
             <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Upload a clear portrait photo for visual expression and eye-activity profiling.
+              Upload a clear portrait photo, or take one with the integrated camera, for visual expression and
+              eye-activity profiling.
             </p>
             <input
               ref={faceInputRef}
@@ -126,22 +192,60 @@ export function NewAssessment() {
               className="hidden"
               onChange={(e) => setFaceFile(e.target.files?.[0] ?? null)}
             />
-            <button
-              type="button"
-              onClick={() => faceInputRef.current?.click()}
-              className="flex min-h-[160px] flex-col items-center justify-center gap-md rounded-lg border-2 border-dashed border-outline-variant bg-surface-container-low p-xl text-center transition-colors hover:bg-surface-container group-hover:border-primary-fixed-dim"
-            >
-              <MaterialIcon name="image" className="text-4xl text-outline" />
-              <div>
-                <p className="font-body-sm text-body-sm text-on-surface max-w-[200px] truncate">
-                  {faceCaptured ? faceFile?.name : 'Upload JPEG or PNG file'}
-                </p>
-                <p className="mt-xs font-label-sm text-label-sm text-on-surface-variant">or drag it here</p>
-              </div>
-              <span className="rounded-md border border-outline-variant bg-surface-container-highest px-md py-sm font-label-md text-label-md text-on-surface transition-all hover:bg-primary hover:text-on-primary">
-                {faceCaptured ? 'Replace Image' : 'Browse Image'}
-              </span>
-            </button>
+
+            {cameraOpen ? (
+              <CameraCapture
+                onCapture={(file) => {
+                  setFaceFile(file)
+                  setDropError(null)
+                  setCameraOpen(false)
+                }}
+                onClose={() => setCameraOpen(false)}
+              />
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => faceInputRef.current?.click()}
+                  {...dropZoneProps('face')}
+                  className={`flex min-h-[160px] flex-col items-center justify-center gap-md overflow-hidden rounded-lg border-2 border-dashed p-xl text-center transition-colors group-hover:border-primary-fixed-dim ${
+                    dragTarget === 'face'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-outline-variant bg-surface-container-low hover:bg-surface-container'
+                  }`}
+                >
+                  {facePreview ? (
+                    // Show what will actually be submitted -- a camera capture
+                    // has no meaningful filename to confirm it by.
+                    <img
+                      src={facePreview}
+                      alt="Selected face"
+                      className="h-[120px] w-[120px] rounded-lg border border-outline-variant object-cover"
+                    />
+                  ) : (
+                    <MaterialIcon name="image" className="text-4xl text-outline" />
+                  )}
+                  <div>
+                    <p className="font-body-sm text-body-sm text-on-surface max-w-[200px] truncate">
+                      {faceCaptured ? faceFile?.name : 'Upload JPEG or PNG file'}
+                    </p>
+                    <p className="mt-xs font-label-sm text-label-sm text-on-surface-variant">or drag it here</p>
+                  </div>
+                  <span className="rounded-md border border-outline-variant bg-surface-container-highest px-md py-sm font-label-md text-label-md text-on-surface transition-all hover:bg-primary hover:text-on-primary">
+                    {faceCaptured ? 'Replace Image' : 'Browse Image'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCameraOpen(true)}
+                  className="flex items-center justify-center gap-xs rounded-md border border-outline-variant bg-surface-container-highest px-md py-sm font-label-md text-label-md text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+                >
+                  <MaterialIcon name="photo_camera" className="text-[18px]" />
+                  Use Integrated Camera
+                </button>
+              </>
+            )}
           </section>
 
           {/* Step 2: Speech Analysis Upload */}
@@ -153,24 +257,30 @@ export function NewAssessment() {
               <h2 className="font-headline-sm text-headline-sm text-on-surface">Voice Recording Upload</h2>
             </div>
             <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Upload a short voice sample (.wav format, 16kHz preferred) for prosodic acoustic analysis.
+              Upload a short voice sample for prosodic acoustic analysis. WAV, MP3, FLAC, OGG and M4A
+              are all accepted; anything not already 16 kHz mono is resampled server-side.
             </p>
             <input
               ref={speechInputRef}
               type="file"
-              accept="audio/*,.wav"
+              accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg,.aac"
               className="hidden"
               onChange={(e) => setSpeechFile(e.target.files?.[0] ?? null)}
             />
             <button
               type="button"
               onClick={() => speechInputRef.current?.click()}
-              className="flex min-h-[160px] flex-col items-center justify-center gap-md rounded-lg border-2 border-dashed border-outline-variant bg-surface-container-low p-xl text-center transition-colors hover:bg-surface-container group-hover:border-primary-fixed-dim"
+              {...dropZoneProps('speech')}
+              className={`flex min-h-[160px] flex-col items-center justify-center gap-md rounded-lg border-2 border-dashed p-xl text-center transition-colors group-hover:border-primary-fixed-dim ${
+                dragTarget === 'speech'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-outline-variant bg-surface-container-low hover:bg-surface-container'
+              }`}
             >
               <MaterialIcon name="mic" className="text-4xl text-outline" />
               <div>
                 <p className="font-body-sm text-body-sm text-on-surface max-w-[200px] truncate">
-                  {speechCaptured ? speechFile?.name : 'Upload WAV audio file'}
+                  {speechCaptured ? speechFile?.name : 'Upload an audio file'}
                 </p>
                 <p className="mt-xs font-label-sm text-label-sm text-on-surface-variant">or drag it here</p>
               </div>
@@ -317,6 +427,23 @@ export function NewAssessment() {
             <span className="font-label-sm text-label-sm text-on-surface-variant">
               Local LLM offline — report generation will use templated summary.
             </span>
+          )}
+
+          {dropError && (
+            <div
+              role="alert"
+              className="flex items-start gap-xs rounded-lg border border-error/40 bg-error/10 px-md py-sm"
+            >
+              <MaterialIcon name="error" className="mt-[2px] text-[16px] text-error" />
+              <span className="flex-1 font-label-sm text-label-sm text-error">{dropError}</span>
+              <button
+                type="button"
+                onClick={() => setDropError(null)}
+                className="font-label-sm text-label-sm text-error underline"
+              >
+                Dismiss
+              </button>
+            </div>
           )}
 
           {error && (

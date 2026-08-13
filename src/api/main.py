@@ -22,6 +22,7 @@ full tech-stack table names Redis/Postgres for this in production) -- swap
 """
 from __future__ import annotations
 
+import logging
 import uuid
 import datetime
 import json
@@ -37,7 +38,7 @@ from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from src.api.inference import CortexAIPipeline
+from src.api.inference import CortexAIPipeline, UnsupportedAudioFormatError
 from src.api.schemas import (
     AssessmentRequest,
     CounterfactualResponse,
@@ -143,9 +144,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+logger = logging.getLogger(__name__)
+
 pipeline: CortexAIPipeline | None = None
 agent_app = None
 SESSION_STORE: dict[str, dict] = {}
+
+
+@app.exception_handler(UnsupportedAudioFormatError)
+def _unsupported_audio_handler(request, exc: UnsupportedAudioFormatError):
+    """Answer 400 with one actionable sentence.
+
+    Without this the decoder's failure propagated as an unhandled exception, so
+    the client got a 500 and the server log filled with the libtorchcodec
+    loader traceback -- roughly 400 lines listing a failure for every FFmpeg
+    major version it probes, which buries the single line that matters. An
+    undecodable upload is a bad request, not a server fault.
+    """
+    from fastapi.responses import JSONResponse
+
+    logger.warning("Rejected an undecodable audio upload: %s", exc)
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.on_event("startup")

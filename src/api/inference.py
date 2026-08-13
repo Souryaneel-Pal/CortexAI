@@ -81,11 +81,73 @@ def _decode_face_image(b64_string: str) -> torch.Tensor:
     return torch.from_numpy(array).unsqueeze(0).unsqueeze(0)  # (1, 1, 48, 48)
 
 
+class UnsupportedAudioFormatError(ValueError):
+    """The uploaded clip is in a container no installed decoder can read.
+
+    Distinct from a generic ValueError so the API layer can answer 400 (the
+    caller sent something we cannot use) instead of 500 (we broke).
+    """
+
+
+def _supported_audio_formats() -> list[str]:
+    """Formats libsndfile can actually read in this environment."""
+    import soundfile as sf
+
+    preferred = ["WAV", "FLAC", "OGG", "MP3", "AIFF", "CAF"]
+    available = set(sf.available_formats())
+    return [fmt for fmt in preferred if fmt in available]
+
+
+def _ffmpeg_backend_available() -> bool:
+    """Whether torchaudio's FFmpeg-backed decoder can actually load.
+
+    torchcodec ships one shared object per FFmpeg major version and resolves
+    the matching `libavutil` at import time, so "torchaudio is installed" does
+    not imply "FFmpeg decoding works". Probing it keeps the error message
+    honest instead of telling someone to install FFmpeg they already have.
+    """
+    try:
+        from torchcodec._internally_replaced_utils import load_core_libraries
+
+        load_core_libraries()
+        return True
+    except Exception:
+        return False
+
+
+def _describe_audio_container(raw: bytes) -> str:
+    """Name the container from its magic bytes, for the error message.
+
+    "we could not decode your M4A" is actionable; "Format not recognised" is
+    not. Sniffing the header costs nothing and is far more reliable than
+    trusting a filename we were never sent.
+    """
+    if len(raw) < 12:
+        return "empty or truncated file"
+    if raw[:4] == b"RIFF" and raw[8:12] == b"WAVE":
+        return "WAV"
+    if raw[:4] == b"fLaC":
+        return "FLAC"
+    if raw[:4] == b"OggS":
+        return "OGG"
+    if raw[:3] == b"ID3" or raw[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
+        return "MP3"
+    if raw[4:8] == b"ftyp":
+        brand = raw[8:12].decode("ascii", "replace").strip()
+        # M4A, M4B, mp42, isom, qt ... all MPEG-4 containers libsndfile can't read.
+        return f"MPEG-4/M4A container (brand {brand!r})"
+    if raw[:4] == b"\x1aE\xdf\xa3":
+        return "WEBM/Matroska"
+    if raw[:4] == b"FORM":
+        return "AIFF"
+    return f"unrecognised container (starts with {raw[:4]!r})"
+
+
 def _decode_speech_audio(b64_string: str, sample_rate: int = 16000, max_duration_sec: float = 4.0) -> torch.Tensor:
     if not b64_string:
         raise ValueError("No speech audio base64 string provided.")
 
-    import soundfile as sf
+    import soundfile as sf  # noqa: F401  (used below; imported early to fail fast)
 
     if "," in b64_string:
         b64_string = b64_string.split(",", 1)[1]
@@ -104,7 +166,7 @@ def _decode_speech_audio(b64_string: str, sample_rate: int = 16000, max_duration
         waveform = torch.from_numpy(np.atleast_1d(waveform_np))
         if waveform.ndim > 1:
             waveform = waveform.mean(dim=-1)
-    except Exception as sf_err:
+    except Exception:
         try:
             import torchaudio
             waveform_tensor, sr = torchaudio.load(io.BytesIO(raw))
@@ -113,9 +175,33 @@ def _decode_speech_audio(b64_string: str, sample_rate: int = 16000, max_duration
             else:
                 waveform = waveform_tensor
         except Exception as ta_err:
-            raise ValueError(
-                f"Audio decoding failed. soundfile error: {sf_err}; torchaudio error: {ta_err}"
-            )
+            # Both decoders are out. Raise something a *user* can act on rather
+            # than the ~400-line libtorchcodec loader traceback, which lists a
+            # failure for every FFmpeg major version it probes and buries the
+            # one line that matters.
+            #
+            # torchaudio's fallback needs FFmpeg's shared libraries via
+            # torchcodec; where those are absent, the only decodable formats
+            # are libsndfile's, which exclude M4A/AAC/MP4/WEBM -- exactly what
+            # Voice Memos and MediaRecorder produce. The frontend now converts
+            # audio to 16 kHz mono WAV in the browser (frontend/src/lib/audio.ts)
+            # so this path should only be reachable by direct API callers.
+            container = _describe_audio_container(raw)
+            if _ffmpeg_backend_available():
+                # FFmpeg is present, so the container isn't the problem --
+                # the file itself is bad, or has no audio stream.
+                remedy = (
+                    "FFmpeg is available here, so this is most likely a corrupt file, "
+                    "a video with no audio track, or an empty recording."
+                )
+            else:
+                remedy = (
+                    f"This server can only read {', '.join(_supported_audio_formats())}; "
+                    "M4A/AAC, MP4 and WEBM additionally need FFmpeg, which is not installed. "
+                    "Convert the clip to WAV or FLAC, or install FFmpeg "
+                    "(`brew install ffmpeg`) and restart the API."
+                )
+            raise UnsupportedAudioFormatError(f"Could not decode the audio ({container}). {remedy}") from ta_err
 
     if sr != sample_rate:
         import torchaudio

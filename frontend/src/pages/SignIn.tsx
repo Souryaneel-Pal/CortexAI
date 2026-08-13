@@ -26,7 +26,18 @@ export function SignIn() {
       sessionStorage.setItem('auth_user', JSON.stringify(response.user))
       navigate('/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid credentials')
+      // `request()` throws with the raw status line, e.g.
+      // `POST /api/auth/login failed (401): {"detail":"..."}`. Surface a clean
+      // message for the two cases a user can act on, and keep the raw text for
+      // anything else so a real backend fault stays diagnosable.
+      const raw = err instanceof Error ? err.message : String(err)
+      if (raw.includes('(401)')) {
+        setError('Incorrect user ID or password.')
+      } else if (err instanceof TypeError) {
+        setError('Cannot reach the CortexAI API. Start it with `uvicorn src.api.main:app`.')
+      } else {
+        setError(raw)
+      }
     } finally {
       setLoading(false)
     }
@@ -63,9 +74,14 @@ export function SignIn() {
             <div className="flex items-center gap-xs rounded border border-outline-variant bg-surface px-sm py-xs focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
               <MaterialIcon name="email" className="text-outline" />
               <input
-                type="email"
+                // `text`, not `email`: the field accepts a clinician ID as well
+                // as an address (the Admin account signs in as `admin`), and
+                // `type="email"` made the browser block submission for anything
+                // without an "@" -- the request never reached the backend.
+                type="text"
+                autoComplete="username"
                 required
-                placeholder="e.g., julian.vance@cortex.ai"
+                placeholder="admin  or  julian.vance@cortex.ai"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full border-none bg-transparent outline-none font-body-sm text-body-sm text-on-surface"
@@ -79,6 +95,7 @@ export function SignIn() {
               <MaterialIcon name="lock" className="text-outline" />
               <input
                 type="password"
+                autoComplete="current-password"
                 required
                 placeholder="••••••••"
                 value={password}
