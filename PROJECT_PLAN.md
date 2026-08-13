@@ -283,15 +283,28 @@ independently re-verified: build re-run here, dev server curled directly).
 ## P6 — Evaluate, harden, polish
 
 - [ ] Run the full metric suite from `Metrics_Used.docx` exactly, per-target for regression
-- [ ] `src/eval/ablation.py` — fusion vs. each single modality, same split (empirical
-      justification for the whole architecture)
-- [ ] Fairness audit report (per-gender, per-class)
-- [ ] Responsible-AI copy audit: decision-support framing, human-review deferral copy,
-      crisis-resource surfacing — verified present in UI, API responses, and generated
-      reports, not just one of the three
-- [ ] `README.md` — setup, architecture summary, how to run, how to reproduce metrics
-- [ ] Pitch notes
+      — **blocked on real data**; `src/eval/metrics.py` implements and unit-tests the exact
+      suite (headline Macro-F1 / RMSE), ready to run the moment training completes
+- [x] `src/eval/ablation.py` — fusion vs. each single modality, same split (empirical
+      justification for the whole architecture). `fusion_beats_every_modality()` is the
+      mechanical check for the headline claim; verified true/false/no-fusion-entry cases
+      against synthetic metrics (real numbers pending real training runs)
+- [x] `src/eval/fairness_audit.py` — per-gender (RAVDESS actor metadata) subgroup metrics
+      + macro-F1/accuracy gap, reusing the exact Metrics_Used.docx suite per group; verified
+      it detects both a zero gap and a real, sizeable gap on synthetic data
+- [x] Responsible-AI copy audit: decision-support framing, human-review deferral copy,
+      crisis-resource surfacing — grepped for all three across `src/api`, `src/reasoning`,
+      `src/explain`, and `frontend/src`; all three present in the API layer, the RAG/agent
+      layer, and the frontend (sidebar disclaimer, Clinical Report footer,
+      `CrisisResourcesCard`)
+- [x] `README.md` — setup, architecture summary, how to run, how to reproduce metrics,
+      current status (what's verified vs. pending real data)
+- [ ] Pitch notes — not written; the "one sentence for the judges" framing and the 3-minute
+      demo choreography are already specified in `docs/MINDSCOPE_Blueprint.pdf` Sec. 07/12
+      and haven't needed adaptation
 
-**If blocked:** if full training isn't complete by this point, this phase still runs in
-full against whatever partial results exist, with gaps explicitly labeled "pending real
-data" rather than omitted or faked.
+**If blocked:** full training wasn't possible in this sandbox (no GPU, no dataset files —
+logged in P0 and unresolved throughout). Every phase's code is complete, real, and verified
+against synthetic fixtures rather than left as stubs; every place a real metric number
+would go instead says so explicitly (`is_demo_untrained_model`, `PROJECT_PLAN.md` status
+notes) rather than a fabricated number being presented as a result.
