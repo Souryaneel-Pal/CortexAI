@@ -61,5 +61,11 @@ wandb/
 mlruns/
 .hydra/
 
-# SQLite databases
+# SQLite databases -- these hold real assessment records (including uploaded
+# face/audio base64), so neither the live database nor any dated backup taken
+# before a migration may enter version control.
 *.db
+*.db.backup-*
+*.db-journal
+*.sqlite
+*.sqlite3

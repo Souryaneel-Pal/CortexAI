@@ -18,7 +18,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.data.schemas import SCORE_RANGES, StressLevel, TABULAR_TARGET_SCORE_COLUMNS
+from src.data.schemas import SCORE_RANGES, TABULAR_TARGET_SCORE_COLUMNS
 
 
 def class_balanced_weights(class_counts: dict[str, int] | list[int], beta: float = 0.999) -> torch.Tensor:

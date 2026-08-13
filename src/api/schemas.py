@@ -158,6 +158,12 @@ class ReportResponse(BaseModel):
         description="Set when the local LLM was unavailable and a templated summary was served "
         "instead. Shown to the user so a template is never mistaken for a model-written narrative.",
     )
+    from_store: bool = Field(
+        default=False,
+        description="True when this narrative was read back from the database rather than "
+        "generated on this request. Orthogonal to `cached`: a stored llama3.1 narrative is "
+        "from_store=True but cached=False, because it is still model-written.",
+    )
     disclaimer: str = DECISION_SUPPORT_DISCLAIMER
 
 

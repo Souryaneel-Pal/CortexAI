@@ -73,6 +73,32 @@ export function Dashboard() {
     )
   }
 
+  // No history yet (fresh install, or before the first assessment). The
+  // dashboard used to be backed by fabricated seed rows, so this state never
+  // appeared; with that removed, an empty database is a normal condition and
+  // gets an honest empty state instead of charts drawn over zeroes.
+  if (data.totalAssessments === 0) {
+    return (
+      <AppShell showSearch>
+        <section className="flex min-h-[420px] flex-col items-center justify-center gap-md rounded-xl border border-outline-variant bg-surface-container-lowest p-xl text-center shadow-level-1">
+          <MaterialIcon name="monitoring" className="text-5xl text-outline" />
+          <h2 className="font-headline-sm text-headline-sm text-on-surface">No assessments recorded yet</h2>
+          <p className="max-w-md font-body-md text-body-md text-on-surface-variant">
+            Cohort statistics, the stress distribution, and the monthly trend are all derived from real assessment
+            runs. Run your first assessment and it will appear here.
+          </p>
+          <Link
+            to="/assessment/new"
+            className="mt-sm flex items-center gap-2 rounded-lg bg-primary px-6 py-3 font-label-md text-label-md text-on-primary shadow-level-1 transition-colors hover:bg-on-primary-fixed-variant"
+          >
+            <MaterialIcon name="add" className="text-[20px]" />
+            Start New Assessment
+          </Link>
+        </section>
+      </AppShell>
+    )
+  }
+
   const donutData = data.stressDistribution.map((s) => ({ name: s.label, value: s.pct, severity: s.severity }))
   const liveSeverity: Severity | null = prediction ? CLASS_TO_SEVERITY[prediction.predicted_class] ?? null : null
 
@@ -375,8 +401,14 @@ export function Dashboard() {
                   </td>
                 </tr>
               )}
-              {data.recentAssessments.map((row) => (
-                <tr key={row.patientId} className="transition-colors hover:bg-surface-container-low">
+              {data.recentAssessments.map((row, i) => (
+                // Keyed on patient + timestamp + index: a patient can be
+                // assessed more than once, so `patientId` alone duplicates
+                // React keys as soon as real history accumulates.
+                <tr
+                  key={`${row.patientId}-${row.dateTime}-${i}`}
+                  className="transition-colors hover:bg-surface-container-low"
+                >
                   <td className="px-6 py-4 font-label-sm text-label-sm font-medium">{row.patientId}</td>
                   <td className="px-6 py-4 text-on-surface-variant">{row.dateTime}</td>
                   <td className="px-6 py-4">

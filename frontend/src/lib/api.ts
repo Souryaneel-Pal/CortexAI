@@ -140,6 +140,10 @@ export interface ReportResponse {
   generator: string
   /** Set when the local LLM was unavailable and a templated summary was served. */
   fallback_reason: string | null
+  /** Read back from the database rather than generated on this request.
+   *  Orthogonal to `cached` — a stored llama3.1 narrative is from_store
+   *  without being a template. */
+  from_store?: boolean
   disclaimer: string
 }
 

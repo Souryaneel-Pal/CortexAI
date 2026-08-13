@@ -1,51 +1,256 @@
 # CortexAI
 
-Explainable multimodal deep-learning system for psychiatric/mental-health screening,
+Explainable multimodal deep-learning system for psychiatric / mental-health screening,
 built for Hack4Health. CortexAI fuses facial expression, speech emotion, and
 behavioural/acoustic/physiological signals to (1) classify stress severity, (2) estimate
-Depression/Anxiety/Stress scores, and (3) explain every prediction with quantified,
+Depression / Anxiety / Stress scores, and (3) explain every prediction with quantified,
 cited evidence — framed throughout as **decision support, not diagnosis**.
 
-> Renamed from "MindScope" (the name of a prior planning pass whose architecture,
-> design tokens, and technical approach this project follows). See `PROJECT_PLAN.md`
-> for the full phase-by-phase build log and current status.
+The reasoning layer runs entirely on-device via Ollama, so face, voice, physiological
+data, and the generated narrative never leave the machine.
 
-## Status
+---
 
-All six phases (P0–P6) are code-complete, and the three modality encoders plus the
-fusion stack have been **trained on the real datasets** (Apple-silicon MPS). The API
-serves those checkpoints, and every response carries `is_demo_untrained_model: false`
-once they are present.
+## Read this first: what the numbers mean
 
-Reproduce end to end:
+Two facts govern how every output of this system should be interpreted. Both were
+measured, not assumed.
+
+**1. Face and speech emotion recognition work.** The facial encoder reaches macro-F1
+**0.604** on 7-way FER; the speech encoder reaches **0.698** on 8-way RAVDESS with an
+actor-disjoint split. Those are real signal.
+
+**2. The tabular targets are not learnable from the tabular features.** The largest
+absolute correlation between any of the 18 features and any of the three severity scores
+is **0.046**. Gradient-boosted trees reach macro-F1 **0.219** on the 4-class target where
+a *stratified random guess* scores **0.270**, and R² is **negative** (≈ −0.02) for all
+three scores — predicting the training mean beats every model tried.
+
+So: **treat every stress-class and severity-score number this system produces as not
+clinically meaningful on this dataset.** The targets are internally coherent (mean
+Depression rises 9.95 → 18.72 → 25.61 → 30.66 across Healthy → Severe), but nothing
+predicts them from the features. What is demonstrable here is the pipeline, the
+explainability, and the trust/provenance machinery around the predictions.
+
+This honesty is enforced in code, not just documented:
+
+- `src/eval/ablation.py:fusion_beats_every_modality()` returns a **computed boolean**,
+  not an assertion. It currently returns `False`.
+- Every prediction response carries `is_demo_untrained_model`.
+- Every report states which generator wrote it, and a templated fallback always carries a
+  `fallback_reason`.
+- Nothing fabricates history. See [No fabricated data](#no-fabricated-data).
+
+---
+
+## Quick start
 
 ```bash
-python -m src.data.validate_datasets                                  # verify counts/schema
-python -m src.train.train_modality --config configs/tabular.yaml
-python -m src.train.train_modality --config configs/face.yaml
-python -m src.train.train_modality --config configs/speech.yaml
-python -m src.train.train_fusion   --config configs/fusion.yaml
-python -m src.eval.run_evaluation                                     # metric suite + ablation + fairness
+# 1. Backend
+pip install -r requirements.txt
+uvicorn src.api.main:app --reload          # http://127.0.0.1:8000  (/docs for OpenAPI)
+
+# 2. Local reasoning models (see "Local reasoning stack")
+ollama pull llama3.1
+ollama pull nomic-embed-text
+
+# 3. Frontend
+cd frontend && npm install && npm run dev  # http://localhost:5173
+
+# 4. Tests
+pytest                                     # 176 tests
 ```
 
-### Measured results
+### Sign-in
 
-Held-out validation splits; augmentation and SMOTE are applied to the training split
-only. Headline metrics per `docs/Metrics_Used.docx`: **macro-F1** for classification,
-**RMSE** for regression.
+The app opens on a sign-in page at `/`. There is no user store — these are hardcoded
+demo accounts, documented here because they are not a secret:
+
+| Role | User ID | Password | Unlocks |
+|---|---|---|---|
+| **Admin** | `admin` | `admin` | Everything, including **Settings** (model tuning) |
+| Clinician | `julian.vance@cortex.ai` | `password` | Everything except writing Settings |
+
+Both roles can *read* settings; only Admin can change them.
+
+---
+
+## Application flow
+
+```
+  /  SignIn
+  │
+  ├─→ /dashboard          Cohort stats from real stored history + latest live result
+  ├─→ /assessment/new     Upload face + audio, enter clinical metrics → POST /predict
+  │        │
+  │        └─→ /results   4-class prediction, DASS scores, Grad-CAM, SHAP, MDI,
+  │                       audio Integrated Gradients, modality attribution
+  │                       └─ [Generate Clinical Report] → runs Ollama RAG → /reports
+  │
+  ├─→ /reports            The cited narrative + its sources and provenance
+  ├─→ /analytics          Cohort analytics from real stored history
+  └─→ /settings           Admin only: uncertainty gate, MDI sensitivity, modality overrides
+```
+
+Routes other than `/` are wrapped in `ProtectedRoute` and redirect to sign-in without a
+token. The token is a signed JWT held in `sessionStorage` and sent as
+`Authorization: Bearer …` by `frontend/src/lib/api.ts`.
+
+---
+
+## Architecture
+
+Three modality encoders → an emotion→stress bridge → gated cross-modal attention fusion
+→ dual prediction heads → an explainability/trust stack → a grounded RAG report,
+sequenced by a thin agent orchestrator.
+
+| Stage | What | Where |
+|---|---|---|
+| Facial encoder | EfficientNet-B0 + CBAM (fallback: 4-block CNN) | `src/models/face_cnn.py` |
+| Speech encoder | Wav2Vec2-base (fallback: CNN-BiLSTM + SpecAugment) | `src/models/speech_net.py` |
+| Tabular encoder | FT-Transformer + LightGBM stack (fallback: residual MLP) | `src/models/tabular_ft.py` |
+| Emotion→stress bridge | Two modality-specific priors (facial ≠ speech), never merged | `src/data/emotion_stress_map.py` |
+| Fusion | Gated cross-modal attention + modality dropout | `src/models/fusion.py` |
+| Heads | 4-class (MC-dropout uncertainty) + 3-score regression + consistency term | `src/models/heads.py`, `src/train/losses.py` |
+| Explainability | Grad-CAM/Score-CAM, Integrated Gradients, SHAP + attention, Masked-Distress Index, DiCE counterfactuals, conformal sets | `src/explain/` |
+| RAG + agent | Local Ollama (`nomic-embed-text` + `llama3.1`), cited reports, LangGraph orchestrator | `src/reasoning/` |
+| Persistence | SQLAlchemy + SQLite: assessments, reports, settings | `src/api/database.py` |
+| API | FastAPI, 13 routes | `src/api/main.py` |
+| Frontend | React + Vite + TS + Tailwind | `frontend/` |
+
+### API
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/health` | public | Liveness + checkpoint state + Ollama status |
+| POST | `/api/auth/login` | public | Issue a JWT |
+| GET | `/api/settings` | any user | Read inference settings |
+| PUT | `/api/settings` | **Admin** | Update inference settings |
+| GET | `/api/dashboard` | any user | Cohort metrics from stored history |
+| GET | `/api/analytics` | any user | Analytics from stored history |
+| POST | `/predict` (alias `/assess`) | any user | Run an assessment; persists it |
+| GET | `/explain/{id}` | any user | SHAP, Grad-CAM, audio IG, MDI |
+| GET | `/counterfactual/{id}` | any user | Actionable single-feature counterfactual |
+| GET | `/report/{id}` | any user | Generate (or serve stored) cited narrative |
+| POST | `/follow-up` | any user | Grounded answer to a follow-up question |
+
+---
+
+## Admin model settings
+
+`/settings` (Admin only) writes to the `settings` table, and inference reads it **per
+request** — so a change takes effect on the next assessment with no restart.
+
+| Control | Effect | Read at |
+|---|---|---|
+| Uncertainty gate threshold | Defer to a human when confidence falls below it | `inference.py:_uncertainty` |
+| MDI sensitivity | Threshold at which cross-modal contradiction is flagged, and at which crisis resources are force-attached | `inference.py:_explain`, `main.py` report path |
+| Ignore face / speech / tabular | Masks that modality through the fusion gate's `modality_mask` | `inference.py:_preprocess` |
+
+The modality overrides reuse the same `modality_mask` the model was *trained* to degrade
+into via modality dropout, so ignoring a channel is a supported inference mode rather
+than a hack.
+
+---
+
+## Local reasoning stack (Ollama)
+
+```bash
+ollama pull llama3.1          # cited clinical narratives + follow-up answers
+ollama pull nomic-embed-text  # embeds the clinical KB for retrieval
+```
+
+Configure with `OLLAMA_BASE_URL`, `CORTEXAI_OLLAMA_LLM_MODEL`,
+`CORTEXAI_OLLAMA_EMBED_MODEL` (`src/reasoning/ollama_config.py`).
+
+`GET /health` reports this stack live, so the UI warns **before** an assessment that the
+narrative will be templated rather than surprising the clinician afterwards.
+
+**Nothing hard-fails when Ollama is down**, and every degradation is labelled:
+
+| Situation | Retrieval | Report |
+|---|---|---|
+| Ollama up, models pulled | `nomic-embed-text` + vector index | `ollama:llama3.1`, cited |
+| Ollama up, model missing | falls back | template, reason names `ollama pull <model>` |
+| Ollama unreachable | sentence-transformers → TF-IDF | template, reason names `ollama serve` |
+| Model output rejected | — | template, reason names what was rejected |
+
+A generated narrative is **rejected and replaced** — not patched — if it cites a source
+that wasn't retrieved, cites *nothing at all*, or drops the decision-support framing.
+The middle case matters more than it looks: `validate_citations` alone is trivially
+satisfied by a narrative with zero citations, so a fully unsourced report would otherwise
+pass as "grounded". Observed in practice with `llama3.1`. See `check_generated_narrative`.
+
+### Report provenance
+
+Three orthogonal fields, because conflating them mislabels real output:
+
+- `generator` — `ollama:llama3.1`, `anthropic:<model>`, or `template`.
+- `cached` — **this is a template, not model-written.** Drives the UI's "not
+  model-generated" warning.
+- `from_store` — served from SQLite rather than generated this request. A stored
+  `llama3.1` narrative is `from_store: true` with `cached: false`, because it is still
+  model-written.
+
+**Vector index note.** `faiss.IndexFlatIP` is used where FAISS can load safely. In the
+API process it cannot: faiss-cpu and PyTorch each link their own OpenMP runtime, and
+loading both aborts the interpreter (`OMP: Error #15`) in *either* import order — an
+abort, not a catchable exception. There an exact NumPy inner-product index runs instead.
+`IndexFlatIP` *is* brute-force exact search, so this is a numerically identical
+substitute, pinned by a test that compares against real FAISS in a subprocess.
+`KMP_DUPLICATE_LIB_OK=TRUE` suppresses the abort, but the same runs emit
+overflow/invalid warnings from unrelated matmuls — the "silently produce incorrect
+results" mode the OpenMP docs warn about. Not a trade worth making here.
+
+---
+
+## No fabricated data
+
+The dashboard and analytics pages render **only** values computed from stored
+assessments. Where there is no data, the UI says so.
+
+An earlier build seeded the database with 15 invented "historical" assessments — fake
+patient IDs, fake 2023 dates, invented SHAP and MDI values, and hand-written narratives
+stored with `report_generator="ollama:llama3.1"`. That was strictly worse than the
+frontend mock data it replaced: mock data sat behind a `SampleDataBadge` and was visibly
+not real, whereas the same fabrications *inside the assessments table* are
+indistinguishable from genuine output, are served through `/api/dashboard` as real
+history, and presented hand-written text as a model-authored clinical narrative.
+
+That seeder is gone (only configuration defaults are seeded), and the rows it wrote were
+purged. If you have an older database:
+
+```bash
+python -m src.api.database --purge-seed          # dry run: lists what it matched
+python -m src.api.database --purge-seed --apply  # delete them
+```
+
+Genuine assessments are untouched — the match requires both a known seed patient ID and a
+2023 timestamp.
+
+Two pages still show clearly-badged sample data where a single session genuinely cannot
+fill a cohort view (`Results` comparison panels, the `Reports` letterhead). They are
+marked with `SampleDataBadge` and never blended with live values in the same panel.
+
+---
+
+## Measured results
+
+Held-out validation; augmentation and SMOTE are applied to the **training split only**.
+Headline metrics per `docs/Metrics_Used.docx`: macro-F1 for classification, RMSE for
+regression.
 
 | Encoder | Task | Split | Accuracy | Macro-F1 |
 |---|---|---|---|---|
 | **Face** — EfficientNet-B0 + CBAM | 7-way FER emotion | stratified 15% | 0.615 | **0.604** |
-| **Speech** — Wav2Vec2-base | 8-way RAVDESS emotion | 4 held-out **actors** (16/17/19/20) | 0.708 | **0.698** |
+| **Speech** — Wav2Vec2-base | 8-way RAVDESS emotion | 4 held-out **actors** | 0.708 | **0.698** |
 | **Tabular** — FT-Transformer | 4-way `Mental_Health_Status` | stratified 15% | 0.283 | **0.228** |
 
-Fairness audit (RAVDESS actor gender, held-out actors only):
-female macro-F1 **0.714** (n=120) vs male **0.680** (n=120) — a gap of **0.034**.
+Fairness audit (RAVDESS actor gender, held-out actors): female macro-F1 **0.714** (n=120)
+vs male **0.680** (n=120) — a gap of **0.034**.
 
-**Proof-of-fusion ablation** (`python -m src.eval.run_evaluation`) — one trained fusion
-model, one validation split, each arm produced by masking modalities through the fusion
-gate rather than training four separate models:
+**Proof-of-fusion ablation** — one trained model, one validation split, each arm produced
+by masking modalities through the fusion gate:
 
 | Source | Macro-F1 | Weighted-F1 | RMSE (mean) |
 |---|---|---|---|
@@ -55,249 +260,134 @@ gate rather than training four separate models:
 | **fusion** | **0.257** | 0.301 | 11.114 |
 
 `fusion_beats_every_modality()` → **False**. Fusion has the best macro-F1 but a *worse*
-RMSE than tabular-only, so the headline "fusion wins" claim is not supported here and
-the code reports that rather than asserting it.
+RMSE than tabular-only, so the "fusion wins" claim is not supported and the code reports
+that rather than asserting it.
 
-Two honest caveats on these fusion numbers:
+Two caveats on the fusion numbers:
 
 - **Validation pairing is label-independent.** Matched-emotion weak pairing keys the
   sampled face/voice on the row's ground-truth label, so media paired that way encodes
   the answer. That is a defensible *training* prior but would make a validation score
-  meaningless, so `FusionPairDataset(pair_by_label=False)` is used for val — media drawn
-  at random, exactly like a real session (`tests/test_fusion_pairing.py` pins this).
-- **The learned gate collapsed onto face** (face 0.93 / speech 0.06 / tabular 0.01).
-  That is the fingerprint of the training-time pairing: during training the face *is* the
-  most predictive input, so the gate learned to trust it. Combined with the fact that the
-  tabular anchor is noise, the modality-contribution meter should be read as "what the
-  gate learned on this data", not as a clinical statement about which channel matters.
+  meaningless, so `FusionPairDataset(pair_by_label=False)` is used for val.
+- **The learned gate collapsed onto face** (0.93 / 0.06 / 0.01) — the fingerprint of that
+  training-time pairing. Read the modality meter as "what the gate learned on this data",
+  not as a clinical claim about which channel matters.
 
-### The finding that matters most: the tabular targets are not learnable
+Reproduce:
 
-Face and speech emotion recognition work — those numbers are real signal. **The 18
-tabular features carry essentially no information about the targets they are supposed
-to predict**, and the whole point of the honesty scaffolding in this repo is that this
-shows up rather than gets papered over:
+```bash
+python -m src.data.validate_datasets
+python -m src.train.train_modality --config configs/tabular.yaml
+python -m src.train.train_modality --config configs/face.yaml
+python -m src.train.train_modality --config configs/speech.yaml
+python -m src.train.train_fusion   --config configs/fusion.yaml
+python -m src.eval.run_evaluation      # metric suite + ablation + fairness
+```
 
-- The largest absolute correlation between **any** of the 18 features and **any** of the
-  three scores is **0.046** (`Head_Motion_Index` vs `Stress_Score`).
-- Gradient-boosted trees reach macro-F1 **0.219** on the 4-class target; a
-  **stratified random guess scores 0.270**. The models are not beating chance.
-- R² is **negative** for all three regression targets (≈ −0.02), i.e. predicting the
-  training mean beats every model tried.
-- The FT-Transformer lands at macro-F1 0.228 / RMSE 10.53, consistent with the above.
+---
 
-The *targets* are internally coherent — mean Depression rises 9.95 → 18.72 → 25.61 →
-30.66 across Healthy → Severe — so class and scores agree with each other. Nothing
-predicts either from the features. Treat every stress-class and severity-score number
-this system produces as **not clinically meaningful on this dataset**; the pipeline,
-explainability, and trust layers around them are what is demonstrable here.
+## Dataset access
 
-Two consequences worth stating plainly:
+Distributed by the organisers and **not committed** — `data/raw/` is git-ignored, so no
+raw media or participant-level CSV enters version control.
 
-1. **Fusion cannot rescue this.** Face/voice enter as auxiliary evidence anchored on
-   the labelled tabular rows; if the anchor is noise, fusion has nothing to sharpen.
-2. **The "fusion beats every modality" slide is not claimed.**
-   `src/eval/ablation.py:fusion_beats_every_modality()` returns a boolean computed from
-   the measured numbers rather than an assertion, and `src/eval/run_evaluation.py`
-   prints whatever it actually is.
-
-## Dataset Access
-
-The three source datasets are distributed by the Hack4Health organisers and are **not
-committed to this repository** — `data/raw/` is git-ignored (see `.gitignore`) so no
-raw media or participant-level CSV ever enters version control.
-
-**Official dataset link:**
 <https://drive.google.com/drive/folders/1R9ka23jnBsNDyPh6l03f2Zv3d7gyk3tR?usp=sharing>
-
-Download the folder and arrange it under `data/raw/` exactly as below, then run
-`python -m src.data.validate_datasets` to verify counts and schema against
-`docs/Dataset_Description.docx`:
 
 ```
 data/raw/
-├── Extracted_images/          # FER-style 48x48 grayscale faces, one folder per emotion
+├── Extracted_images/          # FER-style 48x48 grayscale, one folder per emotion
 │   ├── Angry/  (3,995)   Disgust/ (436)    Fear/     (4,097)
 │   ├── Happy/  (7,215)   Neutral/ (4,965)  Sad/      (4,830)
 │   └── Surprise/ (3,171)                              # 28,709 total
-├── Audios/                    # RAVDESS speech clips, 7-part filenames
+├── Audios/                    # RAVDESS, 7-part filenames
 │   └── Actor_01/ … Actor_24/  # 1,440 unique .wav (60 per actor)
-└── mental_health_multimodal.csv   # 4,000 rows x 18 features + 4 targets
+└── mental_health_multimodal.csv   # 4,000 rows × 18 features + 4 targets
 ```
 
-Two notes on the archive as distributed:
+Verify with `python -m src.data.validate_datasets`. Two quirks of the archive:
 
-- `Audios/` also ships a nested `audio_speech_actors_01-24/` directory that is a
-  **byte-identical duplicate** of the 24 `Actor_XX/` folders (2,880 files on disk,
-  1,440 unique clips — verified by md5). `SpeechEmotionDataset` de-duplicates by
-  RAVDESS filename automatically, so either layout loads exactly 1,440 clips.
-- The CSV's target column is `Mental_Health_Status`; scores are `Depression_Score`
-  (0–34), `Anxiety_Score` (0–24), `Stress_Score` (0–39).
+- `Audios/` also ships `audio_speech_actors_01-24/`, a **byte-identical duplicate** of
+  the 24 `Actor_XX/` folders (2,880 files on disk, 1,440 unique — verified by md5).
+  `SpeechEmotionDataset` de-duplicates by filename, so either layout loads 1,440 clips.
+- Speech **must** be split by actor, not by clip: 24 actors speak the same two sentences,
+  so a random clip-level split measures speaker memorisation.
 
-## Architecture
+---
 
-Three modality encoders → an emotion→stress bridge → gated cross-modal attention fusion
-→ dual prediction heads → an explainability/trust stack → a grounded RAG report, all
-sequenced by a thin agent orchestrator.
+## Responsible AI
 
-| Stage | What | Where |
-|---|---|---|
-| Facial encoder | EfficientNet-B0 + CBAM (fallback: 4-block CNN) | `src/models/face_cnn.py` |
-| Speech encoder | Wav2Vec2-base (fallback: CNN-BiLSTM + SpecAugment) | `src/models/speech_net.py` |
-| Tabular encoder | FT-Transformer + LightGBM stack (fallback: residual MLP) | `src/models/tabular_ft.py` |
-| Emotion→stress bridge | Two separate modality-specific priors (facial ≠ speech), never merged into one rule | `src/data/emotion_stress_map.py` |
-| Fusion | Gated cross-modal attention + modality dropout | `src/models/fusion.py` |
-| Heads | 4-class (MC-dropout uncertainty) + 3-score regression + consistency term | `src/models/heads.py`, `src/train/losses.py` |
-| Explainability | Grad-CAM/Score-CAM, Integrated Gradients, SHAP + attention, Masked-Distress Index, DiCE counterfactuals, conformal prediction sets | `src/explain/` |
-| RAG + agent | Local Ollama (`nomic-embed-text` + `llama3.1`) over a placeholder clinical KB, cited report generation, LangGraph orchestrator | `src/reasoning/` |
-| API | FastAPI: predict (alias assess) / explain / counterfactual / report / follow-up / health | `src/api/` |
-| Frontend | React + Vite + TS + Tailwind, converted 1:1 from the approved Stitch design, wired to the API | `frontend/` |
-
-The three datasets are **not row-paired** — only the 4000-row tabular table carries real
-ground truth. Face and voice are trained on their own native emotion labels, projected
-onto the shared 4-tier severity axis, and fused onto the labelled tabular rows via
-weak-pairing (matched-emotion sampling, `src/data/loaders.py:FusionPairDataset`) — never
-a fabricated face+voice+row identity match. A tabular-only fallback metric is always
-reported alongside full fusion so results stay honest.
-
-## Responsible AI (non-negotiable, not polish)
-
-- Every prediction-carrying API response and generated report states this is
+- Every prediction-carrying response and every generated report states this is
   decision-support information, not a diagnosis.
-- Low-confidence predictions are flagged for human review (`uncertainty.defer`), via
-  MC-dropout confidence and (once real calibration data exists) conformal prediction sets.
-- Crisis/helpline resources are force-attached whenever severe-distress indicators or a
-  high Masked-Distress Index co-occur — never left to retrieval-ranking chance.
-- The RAG report layer mechanically rejects any LLM output containing a citation that
-  doesn't resolve to an actually-retrieved source, falling back to a templated cached
-  report rather than surfacing an unsourced claim.
-- `data/knowledge_base/` is placeholder content (see its `README.md`) and must be
-  replaced with a licensed, clinically-reviewed knowledge base before any real-world use.
+- Low-confidence predictions are flagged for human review (`uncertainty.defer`) via
+  MC-dropout confidence against the Admin-configurable threshold.
+- Crisis/helpline resources are **force-attached** whenever severe distress or a high
+  Masked-Distress Index co-occur — never left to retrieval-ranking chance.
+- The RAG layer mechanically rejects any narrative with an unresolvable citation, no
+  citation, or missing framing, falling back to a templated report.
+- `data/knowledge_base/` is **placeholder** content (see its `README.md`) and must be
+  replaced with a licensed, clinically-reviewed KB before real-world use.
+- The Masked-Distress Index formula is CortexAI's own construction and is
+  **clinically unvalidated**.
+
+### Security posture (hackathon build)
+
+Not production-ready, and specifically:
+
+- Credentials are hardcoded demo accounts; there is no user store, registration, or
+  password reset.
+- `CORTEXAI_JWT_SECRET` defaults to a development value. **Set it** before any real
+  deployment — with the default, anyone holding the source can mint a valid Admin token.
+- CORS is `allow_origins=["*"]`.
+- The session store is an in-process dict; assessments persist to SQLite but live session
+  state does not survive a restart or scale past one worker.
+- Uploaded face/audio base64 is persisted to the local database.
+
+---
 
 ## Repository layout
 
 ```
 cortexai/
-├── docs/                 # source-of-truth requirements, metrics, dataset schema, Stitch design
-├── data/                 # raw/ (git-ignored — see Dataset Access), knowledge_base/ (placeholder)
+├── docs/                  # requirements, metrics, dataset schema, approved design
+├── data/                  # raw/ (git-ignored), knowledge_base/ (placeholder), cortexai.db
 ├── src/
-│   ├── data/             # loaders, schemas, emotion_stress_map, augmentation
-│   ├── models/           # face_cnn, speech_net, tabular_ft, fusion, heads
-│   ├── train/            # train_modality, train_fusion, losses
-│   ├── explain/          # gradcam, ig_audio, shap_tab, masked_distress, counterfactual, conformal
-│   ├── reasoning/        # ollama_config, retriever, rag_report, agent_graph
+│   ├── data/              # loaders, schemas, emotion_stress_map, augmentation
+│   ├── models/            # face_cnn, speech_net, tabular_ft, fusion, heads
+│   ├── train/             # train_modality, train_fusion, losses
+│   ├── explain/           # gradcam, ig_audio, shap_tab, masked_distress, counterfactual, conformal
+│   ├── reasoning/         # ollama_config, retriever, rag_report, agent_graph
 │   ├── eval/              # metrics, ablation, fairness_audit, run_evaluation
-│   └── api/               # main (FastAPI), schemas, inference
-├── frontend/              # React + Vite + TS + Tailwind
-├── configs/                # face.yaml, speech.yaml, tabular.yaml, fusion.yaml
-├── tests/                   # pytest — 151 tests against synthetic fixtures + the real API
-└── PROJECT_PLAN.md           # phase-by-phase build log
+│   └── api/               # main (FastAPI + auth), schemas, inference, database, dashboard_metrics
+├── frontend/src/
+│   ├── pages/             # SignIn, Dashboard, NewAssessment, Results, ClinicalReport,
+│   │                      # PopulationAnalytics, Settings
+│   ├── lib/               # api, assessmentContext, sessionStore, mockData, chartColors
+│   └── components/        # layout/ + ui/
+├── configs/               # face.yaml, speech.yaml, tabular.yaml, fusion.yaml
+├── tests/                 # pytest — 176 tests
+└── PROJECT_PLAN.md
 ```
 
-## Running it
+## Metrics implemented
 
-```bash
-# Backend
-pip install -r requirements.txt
-uvicorn src.api.main:app --reload
-# -> http://127.0.0.1:8000/health, /docs
-# /health reports is_demo_untrained_model: false once artifacts/checkpoints/ is populated.
-
-# Frontend
-cd frontend && npm install && npm run dev
-# -> http://localhost:5173
-# Point it elsewhere with VITE_API_BASE_URL; defaults to http://127.0.0.1:8000
-
-# Tests
-pytest        # 151 tests
-```
-
-### Local reasoning stack (Ollama)
-
-The RAG layer runs entirely on-device. This system already handles face, voice, and
-physiological data, and the report prompt embeds both the prediction and the retrieved
-clinical text — so keeping generation local avoids sending any of it to a third party.
-
-```bash
-# Install Ollama (https://ollama.com), then:
-ollama pull llama3.1          # writes the cited clinical narratives
-ollama pull nomic-embed-text  # embeds the clinical KB for retrieval
-```
-
-| Role | Model | Where |
-|---|---|---|
-| Narrative + follow-up answers | `llama3.1` via `ChatOllama` | `src/reasoning/rag_report.py` |
-| KB embeddings → vector index | `nomic-embed-text` via `OllamaEmbeddings` | `src/reasoning/retriever.py` |
-| Health probe / config | `OLLAMA_BASE_URL`, `CORTEXAI_OLLAMA_LLM_MODEL`, `CORTEXAI_OLLAMA_EMBED_MODEL` | `src/reasoning/ollama_config.py` |
-
-`GET /health` reports the live state of this stack, so the UI can warn *before* an
-assessment that the narrative will be templated rather than surprising the clinician
-afterwards:
-
-```json
-{"ollama_reachable": true, "llm_model": "llama3.1", "llm_available": true,
- "embedding_model": "nomic-embed-text", "embedding_available": true,
- "retrieval_backend": "ollama", "vector_index": "numpy.exact_inner_product"}
-```
-
-**Nothing hard-fails when Ollama is down.** Each degradation is labelled, never silent —
-a fallback report carries `cached: true`, `generator: "template"`, and a
-`fallback_reason` that the Reports page displays:
-
-| Situation | Retrieval | Report |
-|---|---|---|
-| Ollama running, models pulled | `nomic-embed-text` + vector index | `ollama:llama3.1`, cited |
-| Ollama up, model not pulled | falls back | templated, reason names `ollama pull <model>` |
-| Ollama unreachable | sentence-transformers → TF-IDF | templated, reason names `ollama serve` |
-| Model returns bad output | — | templated, reason names what was rejected |
-
-A generated narrative is **rejected and replaced** (not patched) if it cites a source
-that wasn't retrieved, cites *nothing at all*, or drops the decision-support framing.
-That middle case matters more than it looks: `validate_citations` alone is trivially
-satisfied by a narrative with zero citations, so an entirely unsourced report would
-otherwise pass as "grounded" — observed in practice with `llama3.1`. See
-`check_generated_narrative`.
-
-**Vector index note.** `faiss.IndexFlatIP` is used where FAISS can load safely. In the
-API process it cannot: faiss-cpu and PyTorch each link their own OpenMP runtime, and
-loading both aborts the interpreter (`OMP: Error #15`) in either import order — an
-abort, not a catchable exception. There, an exact NumPy inner-product index runs
-instead. `IndexFlatIP` *is* brute-force exact search, so this is a numerically identical
-substitute, not an approximation — `tests/test_ollama_reasoning.py` pins that they
-return identical neighbours and scores. `KMP_DUPLICATE_LIB_OK=TRUE` does suppress the
-abort, but the same runs emit overflow/invalid warnings from unrelated matmuls, which is
-exactly the "silently produce incorrect results" mode the OpenMP docs warn about — not a
-trade worth making here.
-
-### What the UI shows from a live assessment
-
-`New Assessment` uploads a face image and/or an audio clip, maps the form onto the
-18-feature vector (`frontend/src/lib/featureMapping.ts` — unfilled columns take the
-training-set median, never zero), and POSTs `/assess`. `Explainable Insights` then
-renders, from the model's own output rather than sample data:
-
-- the predicted class with MC-dropout confidence and the three severity scores,
-- **signed SHAP** bars over the 18 features (direction, not just magnitude),
-- the **modality-contribution** donut from the fusion gate's learned weights,
-- the **Grad-CAM overlay** rendered server-side, shown beside the submitted face,
-- **Integrated-Gradients** frame importance across the waveform,
-- the **Masked-Distress Index** with its face-calm / voice-arousal / physio-arousal
-  breakdown and which channel drove the contradiction.
-
-`Clinical Report` pulls the RAG-grounded narrative and its citations from `/report`.
-Pages with no live session keep rendering illustrative sample data behind a
-`SampleDataBadge`; live and sample values are never blended in the same view.
-
-`docker-compose.yml` runs both together. Report generation uses the local Ollama stack
-by default (see above) — no API key needed. Setting `ANTHROPIC_API_KEY` in `.env` enables
-the optional hosted-Claude generator instead; with neither available the API serves
-clearly labelled templated reports (`cached: true` plus a `fallback_reason`).
-
-## Metrics
-
-Exact suite from `docs/Metrics_Used.docx`, implemented in `src/eval/metrics.py`:
+Exact suite from `docs/Metrics_Used.docx`, in `src/eval/metrics.py`:
 
 - **Classification:** Accuracy, Precision, Recall, F1, Macro-F1, Weighted-F1, ROC-AUC,
-  Confusion Matrix — headline metric **Macro-F1** (classes are imbalanced).
-- **Regression** (per target — Depression/Anxiety/Stress): MAE, MSE, RMSE, R², Explained
-  Variance — headline metric **RMSE**.
+  Confusion Matrix — headline **Macro-F1** (classes are imbalanced).
+- **Regression** (per target): MAE, MSE, RMSE, R², Explained Variance — headline
+  **RMSE**.
+
+## Development
+
+```bash
+pytest                              # 176 tests
+ruff check src tests                # Python lint
+cd frontend && npx tsc -b           # TypeScript typecheck
+cd frontend && npx oxlint .         # JS/TS lint
+cd frontend && npm run build        # production build
+```
+
+`docker-compose.yml` runs backend + frontend together. Report generation uses local
+Ollama by default — no API key needed. Setting `ANTHROPIC_API_KEY` enables the optional
+hosted-Claude generator instead; with neither, the API serves clearly-labelled templated
+reports.

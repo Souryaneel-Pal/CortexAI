@@ -31,7 +31,6 @@ from src.data.schemas import (
     TABULAR_ROW_COUNT,
     TABULAR_TARGET_CLASS_COLUMN,
     TABULAR_TARGET_SCORE_COLUMNS,
-    parse_ravdess_filename,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

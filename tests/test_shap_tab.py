@@ -5,7 +5,6 @@ from src.explain.shap_tab import (
     ClassLogitsOnly,
     combine_shap_and_attention,
     rank_features_by_mean_abs_shap,
-    shap_values_for_lightgbm,
     shap_values_for_torch_model,
 )
 from src.models.tabular_ft import NUM_FEATURES, TabularEncoder

@@ -1,7 +1,6 @@
 import os
 from unittest.mock import patch
 
-from src.explain.masked_distress import DEFAULT_MDI_FLAG_THRESHOLD
 from src.reasoning.rag_report import (
     build_grounded_prompt,
     contains_required_framing,

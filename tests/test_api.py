@@ -10,9 +10,44 @@ from PIL import Image
 from src.api.main import app
 
 
+CLINICIAN_CREDENTIALS = {"email": "julian.vance@cortex.ai", "password": "password"}
+ADMIN_CREDENTIALS = {"email": "admin", "password": "admin"}
+
+
+@pytest.fixture(scope="module")
+def anon_client():
+    """Unauthenticated client, for asserting the routes are actually protected."""
+    with TestClient(app) as c:
+        yield c
+
+
+def _login(client: TestClient, credentials: dict) -> str:
+    response = client.post("/api/auth/login", json=credentials)
+    assert response.status_code == 200, response.text
+    return response.json()["token"]
+
+
 @pytest.fixture(scope="module")
 def client():
+    """Client authenticated as the demo Clinician.
+
+    It logs in for real rather than bypassing `get_current_user`: the app used
+    to short-circuit auth whenever `pytest` was importable, which meant every
+    protected route was reachable unauthenticated in tests and the guards were
+    never actually exercised. Going through `/api/auth/login` means the token
+    issuing, signing, and verification path is covered by every API test.
+    """
     with TestClient(app) as c:
+        token = _login(c, CLINICIAN_CREDENTIALS)
+        c.headers.update({"Authorization": f"Bearer {token}"})
+        yield c
+
+
+@pytest.fixture(scope="module")
+def admin_client():
+    with TestClient(app) as c:
+        token = _login(c, ADMIN_CREDENTIALS)
+        c.headers.update({"Authorization": f"Bearer {token}"})
         yield c
 
 
@@ -270,3 +305,124 @@ def test_base64_data_uri_decoding():
     speech_tensor = _decode_speech_audio(audio_data_uri)
     assert speech_tensor.shape == (1, 64000)
 
+
+
+# ---------------------------------------------------------------------------
+# Authentication and the Admin-only settings guard.
+#
+# None of this was reachable before: `get_current_user` returned a hardcoded
+# Admin whenever pytest was in sys.modules, so the guards below were dead code
+# under test. They are the security surface of the app, so they get pinned.
+# ---------------------------------------------------------------------------
+PROTECTED_ROUTES = [
+    ("get", "/api/settings"),
+    ("get", "/api/dashboard"),
+    ("get", "/api/analytics"),
+]
+
+
+@pytest.mark.parametrize(("method", "path"), PROTECTED_ROUTES)
+def test_protected_routes_reject_anonymous_callers(anon_client, method, path):
+    response = getattr(anon_client, method)(path)
+    assert response.status_code == 401, f"{path} served an unauthenticated caller"
+
+
+def test_assessment_endpoints_reject_anonymous_callers(anon_client):
+    response = anon_client.post("/predict", json={"tabular_features": _sample_tabular_features()})
+    assert response.status_code == 401
+
+
+def test_login_rejects_bad_credentials(anon_client):
+    response = anon_client.post(
+        "/api/auth/login", json={"email": "admin", "password": "not-the-password"}
+    )
+    assert response.status_code == 401
+    assert "token" not in response.json()
+
+
+def test_login_returns_role_for_each_demo_account(anon_client):
+    clinician = anon_client.post("/api/auth/login", json=CLINICIAN_CREDENTIALS).json()
+    assert clinician["user"]["role"] == "Clinician"
+    assert clinician["token"]
+
+    admin = anon_client.post("/api/auth/login", json=ADMIN_CREDENTIALS).json()
+    assert admin["user"]["role"] == "Admin"
+
+
+def test_tampered_token_is_rejected(anon_client):
+    token = _login(anon_client, ADMIN_CREDENTIALS)
+    header, payload, signature = token.split(".")
+
+    # Re-sign nothing: flip the payload but keep the original signature. The
+    # HMAC check must catch it -- otherwise anyone could self-promote to Admin.
+    import base64 as _b64
+    import json as _json
+
+    decoded = _json.loads(_b64.urlsafe_b64decode(payload + "=" * (4 - len(payload) % 4)))
+    decoded["role"] = "Admin"
+    decoded["sub"] = "attacker@example.com"
+    forged_payload = _b64.urlsafe_b64encode(_json.dumps(decoded).encode()).rstrip(b"=").decode()
+    forged = f"{header}.{forged_payload}.{signature}"
+
+    response = anon_client.get("/api/settings", headers={"Authorization": f"Bearer {forged}"})
+    assert response.status_code == 401
+
+
+def test_settings_readable_by_clinician(client):
+    body = client.get("/api/settings").json()
+    assert set(body) == {
+        "uncertainty_threshold",
+        "mdi_threshold",
+        "ignore_face",
+        "ignore_speech",
+        "ignore_tabular",
+    }
+
+
+def test_settings_write_is_admin_only(client, admin_client):
+    payload = {
+        "uncertainty_threshold": 0.75,
+        "mdi_threshold": 0.55,
+        "ignore_face": False,
+        "ignore_speech": False,
+        "ignore_tabular": False,
+    }
+
+    # A Clinician may read settings but must not change model behaviour.
+    assert client.put("/api/settings", json=payload).status_code == 403
+
+    original = admin_client.get("/api/settings").json()
+    try:
+        assert admin_client.put("/api/settings", json=payload).status_code == 200
+        assert admin_client.get("/api/settings").json()["uncertainty_threshold"] == 0.75
+    finally:
+        admin_client.put("/api/settings", json=original)
+
+
+def test_persisted_report_is_not_relabelled_as_a_template(client):
+    """Re-reading a stored report must not turn a model-written narrative into
+    a "Templated summary".
+
+    `cached` means "this is a templated fallback, not model-written" -- the UI
+    keys its "Narrative not model-generated" warning off it. The DB-cache path
+    used to hardcode `cached=True` for every stored row, so the second view of
+    an `ollama:llama3.1` narrative (the normal path once persistence exists)
+    claimed it was a template. `from_store` carries the "served from SQLite"
+    fact separately.
+    """
+    session_id = client.post("/assess", json={"tabular_features": _sample_tabular_features()}).json()["session_id"]
+
+    first = client.get(f"/report/{session_id}").json()
+    second = client.get(f"/report/{session_id}").json()
+
+    # Same narrative both times, and the generator attribution is stable.
+    assert first["narrative"] == second["narrative"]
+    assert first["generator"] == second["generator"]
+
+    # The stored read is flagged as such, and `cached` still tracks only
+    # "is this a template", never "did this come from the database".
+    assert second["from_store"] is True
+    assert second["cached"] == (second["generator"] == "template")
+    if second["generator"].startswith("ollama:"):
+        assert second["cached"] is False, "a stored llama3.1 narrative is not a template"
+        assert second["fallback_reason"] is None

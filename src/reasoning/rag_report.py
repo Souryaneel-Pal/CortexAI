@@ -182,8 +182,8 @@ def generate_cached_report(
     confidence = prediction_result["confidence"]
 
     lines = [
-        f"This is decision-support information, not a diagnosis. It summarizes an automated "
-        f"multimodal screening result for review by a qualified professional.",
+        "This is decision-support information, not a diagnosis. It summarizes an automated "
+        "multimodal screening result for review by a qualified professional.",
         "",
         f"The system's predicted status is {class_name}, with {confidence:.0%} confidence.",
     ]

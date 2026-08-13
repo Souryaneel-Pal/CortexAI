@@ -26,8 +26,6 @@ import uuid
 import datetime
 import json
 import os
-import sys
-import collections
 import random
 import hmac
 import hashlib
@@ -37,7 +35,7 @@ import torch
 
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from src.api.inference import CortexAIPipeline
 from src.api.schemas import (
@@ -59,8 +57,10 @@ from src.explain.counterfactual import format_counterfactual_narrative, generate
 from src.reasoning.agent_graph import answer_follow_up, build_agent_graph
 
 # --- Security / JWT Helpers ---
-SECRET_KEY = "cortexai_secret_key_for_jwt_tokens_2026"
-IS_TESTING = "pytest" in sys.modules or "unittest" in sys.modules
+# Read from the environment so a deployment can set a real secret. The default
+# is a development-only value: with it, anyone who has the source can mint a
+# valid token, so `CORTEXAI_JWT_SECRET` must be set before any real use.
+SECRET_KEY = os.environ.get("CORTEXAI_JWT_SECRET", "dev-only-insecure-cortexai-signing-key")
 
 def base64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
@@ -97,11 +97,22 @@ def verify_jwt(token: str) -> dict | None:
         return None
 
 def get_current_user(authorization: str = Header(None)) -> dict:
-    if IS_TESTING:
-        return {"sub": "julian.vance@cortex.ai", "name": "Dr. Julian Vance", "role": "Admin"}
+    """Resolve the caller from a Bearer token, or reject with 401.
+
+    This deliberately has **no test-mode bypass**. An earlier version returned
+    a hardcoded Admin whenever `pytest` was in `sys.modules`, which meant the
+    entire authentication and the Admin-only guard on `PUT /api/settings` were
+    unreachable in tests -- the one behaviour most worth pinning was the one
+    thing no test could exercise, and a stray `import pytest` anywhere in a
+    production process would have disabled auth outright.
+
+    Tests authenticate for real against the demo accounts, or override this
+    dependency explicitly via `app.dependency_overrides` (see tests/test_api.py),
+    which keeps the bypass in the test suite where it belongs.
+    """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
-    token = authorization.split(" ")[1]
+    token = authorization.split(" ", 1)[1]
     payload = verify_jwt(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -184,8 +195,11 @@ def login(request: LoginRequest):
     email = request.email.strip().lower()
     password = request.password
     
-    # Mock accounts
-    if email == "admin@cortex.ai" and password == "admin123":
+    # Demo accounts. These are hardcoded on purpose for the hackathon build --
+    # there is no user store, and the credentials are documented in README.md.
+    # Replace with a real identity provider before any deployment: see the
+    # "Authentication" section of the README for what this is and is not.
+    if email == "admin" and password == "admin":
         role = "Admin"
         name = "System Administrator"
     elif email == "julian.vance@cortex.ai" and password == "password":
@@ -244,121 +258,16 @@ def get_dashboard(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/analytics")
 def get_analytics(current_user: dict = Depends(get_current_user)):
-    from src.api.database import SessionLocal, DBAssessment
-    db = SessionLocal()
-    try:
-        assessments = db.query(DBAssessment).all()
-        if not assessments:
-            return {
-                "kpis": [],
-                "heatmap": [],
-                "emotionFrequency": [],
-                "riskBreakdown": [],
-                "correlation": []
-            }
-            
-        total = len(assessments)
-        unique_patients = len(set(a.patient_id for a in assessments))
-        
-        critical = 0
-        stress_sum = 0.0
-        for a in assessments:
-            stress_sum += a.stress_score
-            # check severe or mdi flag
-            mdi_flagged = False
-            if a.masked_distress_index:
-                try:
-                    mdi_flagged = json.loads(a.masked_distress_index).get("flag", False)
-                except Exception:
-                    pass
-            if a.predicted_class == "Severe_Stress" or mdi_flagged:
-                critical += 1
-                
-        avg_stress = round(stress_sum / total, 1) if total > 0 else 0.0
-        
-        # Heatmap counts by day (Mon-Sun) and hour block
-        heatmap_data = collections.defaultdict(int)
-        for a in assessments:
-            day_name = a.completed_at.strftime("%a")
-            hour = a.completed_at.hour
-            hour_block_idx = min(11, hour // 2)
-            hour_label = ["2A", "4A", "6A", "8A", "10A", "12P", "2P", "4P", "6P", "8P", "10P", "12A"][hour_block_idx]
-            heatmap_data[(day_name, hour_label)] += 1
-            
-        max_count = max(heatmap_data.values()) if heatmap_data else 1
-        days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-        hours = ['2A', '4A', '6A', '8A', '10A', '12P', '2P', '4P', '6P', '8P', '10P', '12A']
-        heatmap = []
-        for d in days:
-            for h in hours:
-                count = heatmap_data[(d, h)]
-                intensity = count / max_count if max_count > 0 else 0.0
-                heatmap.append({"day": d, "hour": h, "intensity": round(intensity, 2)})
-                
-        # Risk breakdown by age group
-        # Segments: Adults, Seniors, Adolescents
-        risk_by_seg = collections.defaultdict(lambda: {"low": 0, "medium": 0, "high": 0})
-        for a in assessments:
-            seg = a.demographic or "Adults"
-            # Map class to low/medium/high risk
-            if a.predicted_class in ("Healthy", "Mild_Stress"):
-                risk_by_seg[seg]["low"] += 1
-            elif a.predicted_class == "Moderate_Stress":
-                risk_by_seg[seg]["medium"] += 1
-            elif a.predicted_class == "Severe_Stress":
-                risk_by_seg[seg]["high"] += 1
-                
-        risk_breakdown = []
-        for seg in ("Adults", "Seniors", "Adolescents"):
-            seg_counts = risk_by_seg[seg]
-            seg_total = sum(seg_counts.values())
-            if seg_total > 0:
-                risk_breakdown.append({
-                    "segment": seg,
-                    "low": int(round(seg_counts["low"] / seg_total * 100)),
-                    "medium": int(round(seg_counts["medium"] / seg_total * 100)),
-                    "high": int(round(seg_counts["high"] / seg_total * 100))
-                })
-            else:
-                risk_breakdown.append({
-                    "segment": seg,
-                    "low": 60, "medium": 25, "high": 15
-                })
-                
-        # Static correlation matrix matching mockData.ts
-        correlation = [
-            { "rowLabel": "Stress", "colLabel": "HRV", "value": 0.89 },
-            { "rowLabel": "Stress", "colLabel": "EDA", "value": 0.72 },
-            { "rowLabel": "Stress", "colLabel": "Temp", "value": 0.15 },
-            { "rowLabel": "Sleep", "colLabel": "HRV", "value": -0.65 },
-            { "rowLabel": "Sleep", "colLabel": "EDA", "value": -0.32 },
-            { "rowLabel": "Sleep", "colLabel": "Temp", "value": 0.05 },
-            { "rowLabel": "Activity", "colLabel": "HRV", "value": 0.42 },
-            { "rowLabel": "Activity", "colLabel": "EDA", "value": 0.58 },
-            { "rowLabel": "Activity", "colLabel": "Temp", "value": 0.28 }
-        ]
-        
-        return {
-            "kpis": [
-                { "label": "Active Patients", "value": f"{unique_patients:,}", "delta": "+12%", "deltaDirection": "up" },
-                { "label": "Critical Alerts", "value": str(critical), "delta": "+3", "deltaDirection": "up", "sub": "Requiring immediate review" },
-                { "label": "AI Efficacy Score", "value": "94%", "sub": "Prediction accuracy this month", "isAi": True },
-                { "label": "Avg. Stress Index", "value": str(avg_stress), "sub": "/ 10" }
-            ],
-            "heatmap": heatmap,
-            "emotionFrequency": [
-                { "emotion": "Anxiety", "value": 88 },
-                { "emotion": "Agitation", "value": 62 },
-                { "emotion": "Fatigue", "value": 74 },
-                { "emotion": "Apathy", "value": 50 },
-                { "emotion": "Sadness", "value": 58 },
-                { "emotion": "Anger", "value": 40 }
-            ],
-            "riskBreakdown": risk_breakdown,
-            "correlation": correlation
-        }
-    finally:
-        db.close()
+    """Cohort analytics, derived entirely from stored assessments.
+
+    See `src/api/dashboard_metrics.derive_analytics_metrics` for the list of
+    hardcoded values this replaced -- including a fabricated "AI Efficacy
+    Score: 94%" that contradicted the project's own measured macro-F1 of 0.228.
+    """
+    from src.api.dashboard_metrics import derive_analytics_metrics
+
+    return derive_analytics_metrics()
+
 
 # --- Assessment & Explain Endpoints ---
 
@@ -390,7 +299,9 @@ def assess(request: AssessmentRequest, current_user: dict = Depends(get_current_
         
         db_assess = DBAssessment(
             session_id=session_id,
-            completed_at=datetime.datetime.utcnow(),
+            # Naive UTC to match the DateTime column and the dashboard parser;
+            # utcnow() itself is deprecated for removal in 3.12+.
+            completed_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
             patient_id=patient_id,
             demographic=demographic,
             tabular_features=json.dumps(request.tabular_features.model_dump()),
@@ -557,15 +468,26 @@ def report(session_id: str, current_user: dict = Depends(get_current_user)) -> R
     if db_assess is None:
         raise HTTPException(status_code=404, detail="Unknown session_id -- call /assess first.")
         
-    # Check if report already exists in database
+    # Already generated for this session -- serve the stored narrative rather
+    # than paying for a second LLM run over identical inputs.
     if db_assess.report_narrative is not None:
+        stored_generator = db_assess.report_generator or "template"
         return ReportResponse(
             session_id=session_id,
             narrative=db_assess.report_narrative,
             citations=json.loads(db_assess.report_citations) if db_assess.report_citations else [],
-            cached=True,
-            generator=db_assess.report_generator or "template",
-            fallback_reason=db_assess.report_fallback_reason
+            # `cached` means "this is a templated fallback, not model-written" --
+            # it is what the UI keys the "Narrative not model-generated" warning
+            # off. It must NOT be set merely because the row came back from
+            # SQLite: hardcoding cached=True here relabelled every persisted
+            # llama3.1 narrative as a "Templated summary" the second time it was
+            # viewed, which (after persistence landed) is the normal path. The
+            # stored generator is the source of truth for that distinction;
+            # `from_store` carries the "served from the database" fact instead.
+            cached=stored_generator == "template",
+            generator=stored_generator,
+            fallback_reason=db_assess.report_fallback_reason,
+            from_store=True,
         )
 
     # Reconstruct state and execute RAG report generation on demand

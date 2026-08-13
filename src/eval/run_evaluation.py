@@ -27,7 +27,6 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from src.data.loaders import DEFAULT_SPEECH_ROOT, SpeechEmotionDataset
 from src.data.schemas import SPEECH_EMOTIONS, STRESS_LEVEL_NAMES, StressLevel, TABULAR_TARGET_SCORE_COLUMNS
 from src.eval.ablation import build_ablation_report
 from src.eval.fairness_audit import fairness_audit_by_gender
