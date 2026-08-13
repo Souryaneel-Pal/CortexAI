@@ -62,10 +62,19 @@ _FALLBACK_PHYSIO_REFERENCE = PhysiologicalReferenceStats(
 
 
 def _decode_face_image(b64_string: str) -> torch.Tensor:
+    if not b64_string:
+        raise ValueError("No facial image base64 string provided.")
+
     from PIL import Image
 
     if "," in b64_string:
         b64_string = b64_string.split(",", 1)[1]
+
+    b64_string = b64_string.strip()
+    missing_padding = len(b64_string) % 4
+    if missing_padding:
+        b64_string += "=" * (4 - missing_padding)
+
     raw = base64.b64decode(b64_string)
     image = Image.open(io.BytesIO(raw)).convert("L").resize((48, 48))
     array = np.array(image, dtype=np.float32) / 255.0
@@ -73,18 +82,43 @@ def _decode_face_image(b64_string: str) -> torch.Tensor:
 
 
 def _decode_speech_audio(b64_string: str, sample_rate: int = 16000, max_duration_sec: float = 4.0) -> torch.Tensor:
+    if not b64_string:
+        raise ValueError("No speech audio base64 string provided.")
+
     import soundfile as sf
 
     if "," in b64_string:
         b64_string = b64_string.split(",", 1)[1]
+
+    b64_string = b64_string.strip()
+    missing_padding = len(b64_string) % 4
+    if missing_padding:
+        b64_string += "=" * (4 - missing_padding)
+
     raw = base64.b64decode(b64_string)
-    waveform, sr = sf.read(io.BytesIO(raw), dtype="float32", always_2d=False)
-    waveform = torch.from_numpy(np.atleast_1d(waveform))
-    if waveform.ndim > 1:
-        waveform = waveform.mean(dim=-1)
+    waveform = None
+    sr = None
+
+    try:
+        waveform_np, sr = sf.read(io.BytesIO(raw), dtype="float32", always_2d=False)
+        waveform = torch.from_numpy(np.atleast_1d(waveform_np))
+        if waveform.ndim > 1:
+            waveform = waveform.mean(dim=-1)
+    except Exception as sf_err:
+        try:
+            import torchaudio
+            waveform_tensor, sr = torchaudio.load(io.BytesIO(raw))
+            if waveform_tensor.ndim > 1:
+                waveform = waveform_tensor.mean(dim=0)
+            else:
+                waveform = waveform_tensor
+        except Exception as ta_err:
+            raise ValueError(
+                f"Audio decoding failed. soundfile error: {sf_err}; torchaudio error: {ta_err}"
+            )
+
     if sr != sample_rate:
         import torchaudio
-
         waveform = torchaudio.functional.resample(waveform, sr, sample_rate)
 
     max_samples = int(sample_rate * max_duration_sec)
