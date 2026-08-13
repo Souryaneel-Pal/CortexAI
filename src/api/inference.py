@@ -64,6 +64,8 @@ _FALLBACK_PHYSIO_REFERENCE = PhysiologicalReferenceStats(
 def _decode_face_image(b64_string: str) -> torch.Tensor:
     from PIL import Image
 
+    if "," in b64_string:
+        b64_string = b64_string.split(",", 1)[1]
     raw = base64.b64decode(b64_string)
     image = Image.open(io.BytesIO(raw)).convert("L").resize((48, 48))
     array = np.array(image, dtype=np.float32) / 255.0
@@ -73,6 +75,8 @@ def _decode_face_image(b64_string: str) -> torch.Tensor:
 def _decode_speech_audio(b64_string: str, sample_rate: int = 16000, max_duration_sec: float = 4.0) -> torch.Tensor:
     import soundfile as sf
 
+    if "," in b64_string:
+        b64_string = b64_string.split(",", 1)[1]
     raw = base64.b64decode(b64_string)
     waveform, sr = sf.read(io.BytesIO(raw), dtype="float32", always_2d=False)
     waveform = torch.from_numpy(np.atleast_1d(waveform))

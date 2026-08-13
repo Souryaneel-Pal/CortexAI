@@ -236,3 +236,37 @@ def test_report_declares_its_generator(client):
     if body["cached"]:
         assert body["fallback_reason"]
     assert body["citations"]
+
+
+def test_base64_data_uri_decoding():
+    from src.api.inference import _decode_face_image, _decode_speech_audio
+    import base64
+    import io
+    from PIL import Image
+    import numpy as np
+    import soundfile as sf
+
+    # Create a simple 48x48 dummy image in memory
+    img = Image.new('L', (48, 48), color=128)
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    img_bytes = img_byte_arr.getvalue()
+    img_b64 = base64.b64encode(img_bytes).decode('utf-8')
+    img_data_uri = f"data:image/png;base64,{img_b64}"
+
+    # Verify _decode_face_image handles Data URI prefix
+    face_tensor = _decode_face_image(img_data_uri)
+    assert face_tensor.shape == (1, 1, 48, 48)
+
+    # For audio, create a minimal valid WAV file (100ms at 16000Hz)
+    audio_data = np.zeros(1600, dtype=np.float32)
+    audio_byte_arr = io.BytesIO()
+    sf.write(audio_byte_arr, audio_data, 16000, format='WAV', subtype='PCM_16')
+    audio_bytes = audio_byte_arr.getvalue()
+    audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+    audio_data_uri = f"data:audio/wav;base64,{audio_b64}"
+
+    # Verify _decode_speech_audio handles Data URI prefix
+    speech_tensor = _decode_speech_audio(audio_data_uri)
+    assert speech_tensor.shape == (1, 64000)
+
