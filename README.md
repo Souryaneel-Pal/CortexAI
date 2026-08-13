@@ -39,7 +39,7 @@ Upload or capture a face, add a voice clip, enter the clinical indicators, and r
 ### 2 · Explainability and the grounded report
 Grad-CAM over the submitted face, signed SHAP across the 18 features, the Masked-Distress Index, and the Ollama-generated cited narrative.
 
-<video src="https://github.com/SouryaneelPal/CortexAI/raw/main/docs/media/02-explainability-and-report.mp4" controls muted playsinline width="100%"></video>
+https://github.com/SouryaneelPal/CortexAI/raw/main/docs/media/02-explainability-and-report.mp4
 
 [⬇ Download 02-explainability-and-report.mp4](docs/media/02-explainability-and-report.mp4)
 
