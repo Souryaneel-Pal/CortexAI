@@ -23,6 +23,18 @@
 
 ---
 
+<<<<<<< HEAD
+=======
+# Test Cases
+
+## Test Case 1
+
+![Test Case 1](<Screen Recording 2026-08-13 at 21.29.21.mp4>)
+
+
+---
+
+>>>>>>> 9b9f4e1 (fix: update video file extension for Test Case 1 in README)
 ## Architecture & Pipeline
 
 CortexAI operates on a two-stage fusion architecture that respects the fact that the provided datasets are not natively row-paired.
