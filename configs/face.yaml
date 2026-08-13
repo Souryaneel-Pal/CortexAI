@@ -1,0 +1,39 @@
+# Facial encoder config (src/models/face_cnn.py)
+# EfficientNet-B0 + CBAM, fine-tuned on FER. Fallback: 4-block CNN from scratch.
+modality: facial
+
+data:
+  root: data/raw/facial
+  image_size: 48
+  num_classes: 7
+  batch_size: 64
+  num_workers: 4
+  val_split: 0.15
+  test_split: 0.15
+
+model:
+  backbone: efficientnet_b0   # timm model name; fallback backbone: "simple_cnn"
+  pretrained: true
+  use_cbam: true
+  embed_dim: 256
+  dropout: 0.3
+  freeze_backbone_epochs: 2   # warm up the head before unfreezing the backbone
+
+imbalance:
+  strategy: class_balanced_focal   # class_balanced_focal | oversample | none
+  focal_gamma: 2.0
+  class_balanced_beta: 0.999
+
+train:
+  epochs: 30
+  optimizer: adamw
+  lr: 3.0e-4
+  weight_decay: 1.0e-4
+  scheduler: cosine
+  early_stopping_patience: 6
+  seed: 42
+
+explain:
+  gradcam_target_layer: "backbone.conv_head"
+
+checkpoint_dir: artifacts/checkpoints/face

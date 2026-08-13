@@ -1,0 +1,26 @@
+[
+  {
+    "id": "crisis-us-988",
+    "text": "In the United States, the 988 Suicide & Crisis Lifeline is reachable by calling or texting 988, available 24/7, for anyone in emotional distress or suicidal crisis.",
+    "source": "Placeholder crisis-resource entry -- verify current number/availability before real-world use, see data/knowledge_base/README.md",
+    "category": "crisis_resource"
+  },
+  {
+    "id": "crisis-generic-emergency",
+    "text": "If there is an immediate risk to someone's life or safety, contact local emergency services immediately rather than waiting for a screening or professional appointment.",
+    "source": "Placeholder crisis-resource entry -- verify current guidance before real-world use, see data/knowledge_base/README.md",
+    "category": "crisis_resource"
+  },
+  {
+    "id": "crisis-professional-followup",
+    "text": "For non-emergency but persistent or worsening symptoms, scheduling an appointment with a licensed mental-health professional (therapist, counselor, psychiatrist, or primary-care physician) is the recommended next step.",
+    "source": "Placeholder crisis-resource entry -- verify current guidance before real-world use, see data/knowledge_base/README.md",
+    "category": "crisis_resource"
+  },
+  {
+    "id": "crisis-international-directory",
+    "text": "Outside the United States, the International Association for Suicide Prevention maintains a directory of crisis centers by country; a real deployment should integrate a maintained, geo-aware version of this directory rather than a static list.",
+    "source": "Placeholder crisis-resource entry -- verify current guidance before real-world use, see data/knowledge_base/README.md",
+    "category": "crisis_resource"
+  }
+]

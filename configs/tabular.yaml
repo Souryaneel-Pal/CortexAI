@@ -1,0 +1,54 @@
+# Tabular encoder config (src/models/tabular_ft.py)
+# FT-Transformer stacked with LightGBM. Fallback: residual MLP + BatchNorm.
+# This is the only modality carrying real ground truth (docs/1.docx).
+modality: tabular
+
+data:
+  csv_path: data/raw/numerical.csv
+  num_classes: 4
+  num_score_targets: 3
+  batch_size: 128
+  num_workers: 2
+  val_split: 0.15
+  test_split: 0.15
+  stratify_by: Mental_Health_Status
+
+model:
+  backbone: ft_transformer   # ft_transformer | residual_mlp (fallback)
+  embed_dim: 256
+  n_blocks: 3
+  n_heads: 8
+  attention_dropout: 0.2
+  ffn_dropout: 0.1
+  token_dim: 192
+
+  # residual MLP fallback params (used only when backbone: residual_mlp)
+  fallback:
+    hidden_dims: [256, 128, 64]
+    dropout: 0.3
+
+ensemble:
+  use_lightgbm_stack: true
+  lgbm_params:
+    n_estimators: 300
+    max_depth: -1
+    learning_rate: 0.05
+    num_leaves: 31
+
+imbalance:
+  strategy: smote   # imbalanced-learn SMOTE on the tabular feature space
+  smote_random_state: 42
+
+train:
+  epochs: 60
+  optimizer: adamw
+  lr: 1.0e-3
+  weight_decay: 1.0e-5
+  scheduler: cosine
+  early_stopping_patience: 10
+  seed: 42
+
+explain:
+  shap_background_samples: 100
+
+checkpoint_dir: artifacts/checkpoints/tabular

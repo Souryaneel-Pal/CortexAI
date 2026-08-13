@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MindScope AI - Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-primary-fixed": "#001e2f",
+                      "surface-container-lowest": "#ffffff",
+                      "inverse-on-surface": "#eaf1ff",
+                      "error-container": "#ffdad6",
+                      "surface-container-low": "#eff4ff",
+                      "on-surface-variant": "#3e4850",
+                      "on-tertiary-container": "#3e0097",
+                      "on-secondary-fixed-variant": "#005048",
+                      "on-surface": "#0b1c30",
+                      "surface-container-high": "#dce9ff",
+                      "tertiary-container": "#a986ff",
+                      "surface-tint": "#006591",
+                      "outline-variant": "#bec8d2",
+                      "on-primary-fixed-variant": "#004c6e",
+                      "on-background": "#0b1c30",
+                      "on-primary": "#ffffff",
+                      "on-tertiary": "#ffffff",
+                      "primary": "#006591",
+                      "on-secondary-fixed": "#00201c",
+                      "primary-fixed-dim": "#89ceff",
+                      "surface-variant": "#d3e4fe",
+                      "on-secondary": "#ffffff",
+                      "secondary-container": "#6df5e1",
+                      "surface": "#f8f9ff",
+                      "surface-bright": "#f8f9ff",
+                      "on-tertiary-fixed": "#23005c",
+                      "on-error-container": "#93000a",
+                      "secondary-fixed": "#71f8e4",
+                      "surface-dim": "#cbdbf5",
+                      "on-primary-container": "#003751",
+                      "primary-container": "#0ea5e9",
+                      "secondary": "#006b5f",
+                      "surface-container": "#e5eeff",
+                      "on-secondary-container": "#006f64",
+                      "error": "#ba1a1a",
+                      "inverse-surface": "#213145",
+                      "surface-container-highest": "#d3e4fe",
+                      "tertiary": "#6d3bd7",
+                      "on-error": "#ffffff",
+                      "primary-fixed": "#c9e6ff",
+                      "inverse-primary": "#89ceff",
+                      "tertiary-fixed": "#e9ddff",
+                      "outline": "#6e7881",
+                      "background": "#f8f9ff",
+                      "tertiary-fixed-dim": "#d0bcff",
+                      "on-tertiary-fixed-variant": "#5516be",
+                      "secondary-fixed-dim": "#4fdbc8"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "2xl": "48px",
+                      "3xl": "64px",
+                      "base": "4px",
+                      "md": "16px",
+                      "xl": "32px",
+                      "xs": "4px",
+                      "gutter": "24px",
+                      "lg": "24px",
+                      "sm": "8px",
+                      "margin-mobile": "16px",
+                      "margin-desktop": "40px"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "headline-sm": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "label-sm": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "JetBrains Mono"
+                      ],
+                      "display-lg": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-sm": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.04em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+          font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom Shadows */
+        .shadow-elevation-1 {
+            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .ai-glow {
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.15);
+        }
+        
+        /* Glassmorphism */
+        .glass-nav {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        
+        /* Layout Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 24px;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #bec8d2;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6e7881;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex overflow-x-hidden">
+<!-- SideNavBar (Shared Component) -->
+<nav class="hidden md:flex h-screen w-72 flex-col fixed left-0 top-0 border-r border-outline-variant bg-surface z-50">
+<!-- Brand/Header -->
+<div class="p-lg border-b border-outline-variant/30 flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined fill text-primary">psychology</span>
+</div>
+<div>
+<h1 class="font-headline-sm text-headline-sm font-bold text-primary">MindScope AI</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Senior Psychiatrist</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex flex-col h-full p-lg gap-sm overflow-y-auto">
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+<span class="font-label-md text-label-md">New Assessment</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="fact_check">fact_check</span>
+<span class="font-label-md text-label-md">Results</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="font-label-md text-label-md">AI Insights</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+<span class="font-label-md text-label-md">Reports</span>
+</a>
+<!-- ACTIVE STATE -->
+<a class="flex items-center gap-md px-md py-sm bg-surface-container-high text-primary rounded-lg font-bold scale-[0.98] transition-transform" href="#">
+<span class="material-symbols-outlined fill" data-icon="analytics">analytics</span>
+<span class="font-label-md text-label-md">Analytics</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg mt-auto" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+<!-- CTA -->
+<div class="p-lg border-t border-outline-variant/30">
+<button class="w-full bg-primary hover:bg-primary/90 text-on-primary py-sm px-md rounded-lg font-label-md text-label-md transition-colors flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined">add</span>
+                New Assessment
+            </button>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-72 flex flex-col min-h-screen">
+<!-- TopNavBar (Shared Component) -->
+<header class="docked full-width top-0 sticky z-40 border-b border-outline-variant shadow-sm bg-surface/80 glass-nav flex justify-between items-center h-16 px-gutter">
+<!-- Mobile Menu Button & Brand -->
+<div class="flex items-center gap-md md:hidden">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-all focus:ring-2 focus:ring-primary focus:ring-offset-2">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">MindScope AI</span>
+</div>
+<!-- Left Side Actions (Empty for standard right alignment, but ready for search if needed) -->
+<div class="hidden md:flex items-center">
+<h2 class="font-headline-sm text-headline-sm font-bold text-on-surface">Executive Analytics</h2>
+</div>
+<!-- Right Actions -->
+<div class="flex items-center gap-sm">
+<div class="hidden md:flex items-center bg-surface-container-low rounded-full px-md py-sm border border-outline-variant mr-md focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+<span class="material-symbols-outlined text-outline text-sm mr-2">search</span>
+<input class="bg-transparent border-none p-0 text-body-sm focus:ring-0 text-on-surface placeholder:text-outline w-48 font-label-sm text-label-sm" placeholder="Search analytics..." type="text"/>
+</div>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-all focus:ring-2 focus:ring-primary focus:ring-offset-2">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-all focus:ring-2 focus:ring-primary focus:ring-offset-2">
+<span class="material-symbols-outlined" data-icon="swap_horiz">swap_horiz</span>
+</button>
+<div class="ml-sm">
+<img alt="Clinician Profile" class="w-8 h-8 rounded-full border border-outline-variant object-cover cursor-pointer hover:ring-2 hover:ring-primary transition-all" data-alt="A small, circular profile picture of a professional clinician in a modern office setting, bright lighting, high resolution." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJVBX-1_2XY6bacOBZlqhTep-LaJLFAnhICI0yNEbnXZCnS2Tef47p0GI9mGA6yATsTlimdwlED7VWNoTL561sI1rE7cAXJY_VVJs1f7DOF85KJrNYw3lcQCW07E2LAh3YMXyG6OyBHvSvw19EGKMPsZLPniBE7Dj5FoWQLiiaH9ZMrxG1dre__ZoiqDqNv5TpEHYuZ8dN1ueZdS9WcaHbH6x_Il97rZBlj6tVP69XjLIvCij_RpHV"/>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<div class="p-gutter max-w-[1440px] mx-auto w-full flex flex-col gap-lg flex-1">
+<!-- Filters & Controls Bar -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-md bg-surface p-md rounded-xl border border-outline-variant shadow-elevation-1">
+<div class="flex flex-wrap items-center gap-md">
+<div class="flex items-center gap-2">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Time Range:</label>
+<select class="bg-surface-container-low border border-outline-variant text-on-surface font-label-sm text-label-sm rounded-md px-3 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+<option>Last 30 Days</option>
+<option>Last Quarter</option>
+<option>YTD</option>
+<option>All Time</option>
+</select>
+</div>
+<div class="flex items-center gap-2">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Demographic:</label>
+<select class="bg-surface-container-low border border-outline-variant text-on-surface font-label-sm text-label-sm rounded-md px-3 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+<option>All Patients</option>
+<option>Adults (18-64)</option>
+<option>Seniors (65+)</option>
+<option>Adolescents (12-17)</option>
+</select>
+</div>
+<div class="flex items-center gap-2">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Condition:</label>
+<select class="bg-surface-container-low border border-outline-variant text-on-surface font-label-sm text-label-sm rounded-md px-3 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+<option>All Monitored</option>
+<option>Anxiety Disorders</option>
+<option>Depressive Disorders</option>
+<option>PTSD</option>
+</select>
+</div>
+</div>
+<div class="flex items-center gap-sm">
+<button class="flex items-center gap-2 px-md py-1.5 bg-secondary-container/20 text-on-secondary-container border border-secondary-container/50 rounded-md font-label-sm text-label-sm hover:bg-secondary-container/30 transition-colors">
+<span class="material-symbols-outlined text-sm">download</span>
+                        Export Report
+                    </button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="dashboard-grid">
+<!-- Top Row: High-Level Stats (3 columns each) -->
+<div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface p-lg rounded-xl border border-outline-variant shadow-elevation-1 flex flex-col gap-sm relative overflow-hidden">
+<div class="flex justify-between items-start">
+<span class="font-label-md text-label-md text-on-surface-variant">Active Patients</span>
+<div class="bg-primary-container/20 p-1.5 rounded-md">
+<span class="material-symbols-outlined text-primary text-sm">groups</span>
+</div>
+</div>
+<div class="flex items-baseline gap-sm">
+<h3 class="font-display-lg text-display-lg text-on-surface">1,248</h3>
+<span class="text-secondary font-label-sm text-label-sm flex items-center">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +12%
+                        </span>
+</div>
+<div class="mt-auto pt-sm">
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[75%] rounded-full"></div>
+</div>
+</div>
+</div>
+<div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface p-lg rounded-xl border border-outline-variant shadow-elevation-1 flex flex-col gap-sm relative overflow-hidden">
+<div class="flex justify-between items-start">
+<span class="font-label-md text-label-md text-on-surface-variant">Critical Alerts</span>
+<div class="bg-error-container/50 p-1.5 rounded-md">
+<span class="material-symbols-outlined text-error text-sm">warning</span>
+</div>
+</div>
+<div class="flex items-baseline gap-sm">
+<h3 class="font-display-lg text-display-lg text-on-surface">24</h3>
+<span class="text-error font-label-sm text-label-sm flex items-center">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +3
+                        </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-auto">Requiring immediate review</p>
+</div>
+<div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface p-lg rounded-xl border border-outline-variant shadow-elevation-1 flex flex-col gap-sm relative overflow-hidden ai-glow">
+<div class="flex justify-between items-start">
+<span class="font-label-md text-label-md text-tertiary">AI Efficacy Score</span>
+<div class="bg-tertiary-container/30 p-1.5 rounded-md">
+<span class="material-symbols-outlined text-tertiary text-sm">psychology</span>
+</div>
+</div>
+<div class="flex items-baseline gap-sm">
+<h3 class="font-display-lg text-display-lg text-on-surface">94%</h3>
+<span class="text-secondary font-label-sm text-label-sm flex items-center">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> Optimal
+                        </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-auto">Prediction accuracy this month</p>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-tertiary to-secondary"></div>
+</div>
+<div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface p-lg rounded-xl border border-outline-variant shadow-elevation-1 flex flex-col gap-sm relative overflow-hidden">
+<div class="flex justify-between items-start">
+<span class="font-label-md text-label-md text-on-surface-variant">Avg. Stress Index</span>
+<div class="bg-surface-container p-1.5 rounded-md">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">vital_signs</span>
+</div>
+</div>
+<div class="flex items-baseline gap-sm">
+<h3 class="font-display-lg text-display-lg text-on-surface">6.8</h3>
+<span class="text-on-surface-variant font-label-sm text-label-sm">/ 10</span>
+</div>
+<div class="w-full mt-auto flex gap-1 h-2">
+<div class="flex-1 bg-secondary rounded-l-full"></div>
+<div class="flex-1 bg-secondary-container"></div>
+<div class="flex-1 bg-surface-tint"></div>
+<div class="flex-1 bg-error-container"></div>
+<div class="flex-1 bg-error rounded-r-full"></div>
+</div>
+</div>
+<!-- Middle Row: Complex Visualizations -->
+<!-- Heatmap (Stress Severity) -->
+<div class="col-span-12 lg:col-span-7 bg-surface p-lg rounded-xl border border-outline-variant shadow-elevation-1 flex flex-col min-h-[360px]">
+<div class="flex justify-between items-center mb-md">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Stress Severity Heatmap</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Temporal distribution of elevated stress events across population.</p>
+</div>
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<div class="flex-1 bg-surface-container-low rounded-lg border border-outline-variant/50 p-md flex items-center justify-center relative overflow-hidden">
+<!-- Simulated Heatmap via Grid of Colored Divs -->
+<div class="w-full h-full flex flex-col gap-1 justify-center">
+<!-- Y-axis labels -->
+<div class="flex gap-2 h-full">
+<div class="flex flex-col justify-between text-[10px] text-outline font-label-sm py-4 w-8 text-right pr-2 border-r border-outline-variant/30">
+<span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+</div>
+<!-- Heatmap Grid -->
+<div class="flex-1 grid grid-cols-12 gap-1 py-1">
+<!-- Generating random-looking heatmap blocks using utility classes -->
+<!-- Row 1 -->
+<div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/20 rounded-sm"></div><div class="bg-primary/40 rounded-sm"></div><div class="bg-primary/60 rounded-sm"></div><div class="bg-error/30 rounded-sm"></div><div class="bg-error/60 rounded-sm"></div><div class="bg-error/80 rounded-sm"></div><div class="bg-primary/50 rounded-sm"></div><div class="bg-primary/30 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div>
+<!-- Row 2 -->
+<div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/30 rounded-sm"></div><div class="bg-primary/50 rounded-sm"></div><div class="bg-error/40 rounded-sm"></div><div class="bg-error/70 rounded-sm"></div><div class="bg-error/90 rounded-sm"></div><div class="bg-error/40 rounded-sm"></div><div class="bg-primary/40 rounded-sm"></div><div class="bg-primary/20 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div>
+<!-- Row 3 -->
+<div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/20 rounded-sm"></div><div class="bg-primary/40 rounded-sm"></div><div class="bg-primary/60 rounded-sm"></div><div class="bg-error/20 rounded-sm"></div><div class="bg-error/50 rounded-sm"></div><div class="bg-error/70 rounded-sm"></div><div class="bg-primary/60 rounded-sm"></div><div class="bg-primary/30 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div>
+<!-- Row 4 -->
+<div class="bg-primary/20 rounded-sm"></div><div class="bg-primary/30 rounded-sm"></div><div class="bg-primary/50 rounded-sm"></div><div class="bg-primary/80 rounded-sm"></div><div class="bg-error/50 rounded-sm"></div><div class="bg-error/80 rounded-sm"></div><div class="bg-error/90 rounded-sm"></div><div class="bg-error/50 rounded-sm"></div><div class="bg-primary/50 rounded-sm"></div><div class="bg-primary/20 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div>
+<!-- Row 5 -->
+<div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/20 rounded-sm"></div><div class="bg-primary/40 rounded-sm"></div><div class="bg-primary/70 rounded-sm"></div><div class="bg-error/40 rounded-sm"></div><div class="bg-error/60 rounded-sm"></div><div class="bg-primary/50 rounded-sm"></div><div class="bg-primary/20 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div>
+<!-- Row 6 -->
+<div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/20 rounded-sm"></div><div class="bg-primary/40 rounded-sm"></div><div class="bg-primary/50 rounded-sm"></div><div class="bg-primary/40 rounded-sm"></div><div class="bg-primary/20 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div>
+<!-- Row 7 -->
+<div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/20 rounded-sm"></div><div class="bg-primary/30 rounded-sm"></div><div class="bg-primary/20 rounded-sm"></div><div class="bg-primary/10 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div><div class="bg-primary/5 rounded-sm"></div>
+</div>
+</div>
+<!-- X-axis labels -->
+<div class="flex text-[10px] text-outline font-label-sm pl-10 border-t border-outline-variant/30 pt-1">
+<div class="flex-1 text-center">2A</div><div class="flex-1 text-center">4A</div><div class="flex-1 text-center">6A</div><div class="flex-1 text-center">8A</div><div class="flex-1 text-center">10A</div><div class="flex-1 text-center">12P</div><div class="flex-1 text-center">2P</div><div class="flex-1 text-center">4P</div><div class="flex-1 text-center">6P</div><div class="flex-1 text-center">8P</div><div class="flex-1 text-center">10P</div><div class="flex-1 text-center">12A</div>
+</div>
+</div>
+</div>
+<!-- Legend -->
+<div class="flex items-center justify-end gap-2 mt-sm font-label-sm text-label-sm text-on-surface-variant">
+<span>Low</span>
+<div class="w-24 h-2 rounded-full bg-gradient-to-r from-primary/10 via-primary to-error"></div>
+<span>High</span>
+</div>
+</div>
+<!-- Frequency Analysis (Emotions - Radar/Polar abstract) -->
+<div class="col-span-12 lg:col-span-5 bg-surface p-lg rounded-xl border border-outline-variant shadow-elevation-1 flex flex-col min-h-[360px]">
+<div class="flex justify-between items-center mb-md">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Emotion Frequency</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">NLP derived emotional states.</p>
+</div>
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<div class="flex-1 relative flex items-center justify-center p-md">
+<!-- Abstract representation of a chart -->
+<div class="w-full max-w-[240px] aspect-square rounded-full border-2 border-outline-variant/20 relative flex items-center justify-center">
+<!-- Rings -->
+<div class="absolute inset-4 rounded-full border border-outline-variant/10"></div>
+<div class="absolute inset-10 rounded-full border border-outline-variant/10"></div>
+<div class="absolute inset-16 rounded-full border border-outline-variant/10"></div>
+<!-- Data Polygon (simulated with CSS clip-path for structural aesthetic) -->
+<div class="absolute inset-0 bg-tertiary/20 border border-tertiary/50" style="clip-path: polygon(50% 10%, 80% 30%, 90% 70%, 60% 90%, 20% 80%, 15% 40%);"></div>
+<!-- Data points & Labels -->
+<div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 font-label-sm text-label-sm text-on-surface">Anxiety</div>
+<div class="absolute top-1/4 right-0 translate-x-4 -translate-y-2 font-label-sm text-label-sm text-on-surface">Agitation</div>
+<div class="absolute bottom-1/4 right-0 translate-x-4 translate-y-2 font-label-sm text-label-sm text-on-surface">Fatigue</div>
+<div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-4 font-label-sm text-label-sm text-on-surface">Apathy</div>
+<div class="absolute bottom-1/4 left-0 -translate-x-4 translate-y-2 font-label-sm text-label-sm text-on-surface">Sadness</div>
+<div class="absolute top-1/4 left-0 -translate-x-4 -translate-y-2 font-label-sm text-label-sm text-on-surface">Anger</div>
+<!-- Center dot -->
+<div class="w-2 h-2 bg-on-surface-variant rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Bottom Row -->
+<!-- Population Risk Breakdown (Bar Chart) -->
+<div class="col-span-12 lg:col-span-6 bg-surface p-lg rounded-xl border border-outline-variant shadow-elevation-1 flex flex-col min-h-[300px]">
+<div class="flex justify-between items-center mb-md">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Population Risk Breakdown</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Stratification by demographic segments.</p>
+</div>
+</div>
+<div class="flex-1 flex flex-col gap-md justify-end pt-md">
+<!-- Bar 1 -->
+<div class="flex items-center gap-sm">
+<span class="w-20 font-label-sm text-label-sm text-on-surface-variant text-right">Adults</span>
+<div class="flex-1 h-6 bg-surface-container rounded-sm overflow-hidden flex">
+<div class="h-full bg-secondary w-[60%] flex items-center px-2 text-[10px] text-on-secondary font-bold">Low</div>
+<div class="h-full bg-surface-tint w-[25%] flex items-center px-2 text-[10px] text-white font-bold">Med</div>
+<div class="h-full bg-error w-[15%] flex items-center px-2 text-[10px] text-on-error font-bold">High</div>
+</div>
+</div>
+<!-- Bar 2 -->
+<div class="flex items-center gap-sm">
+<span class="w-20 font-label-sm text-label-sm text-on-surface-variant text-right">Seniors</span>
+<div class="flex-1 h-6 bg-surface-container rounded-sm overflow-hidden flex">
+<div class="h-full bg-secondary w-[45%] flex items-center px-2 text-[10px] text-on-secondary font-bold">Low</div>
+<div class="h-full bg-surface-tint w-[35%] flex items-center px-2 text-[10px] text-white font-bold">Med</div>
+<div class="h-full bg-error w-[20%] flex items-center px-2 text-[10px] text-on-error font-bold">High</div>
+</div>
+</div>
+<!-- Bar 3 -->
+<div class="flex items-center gap-sm">
+<span class="w-20 font-label-sm text-label-sm text-on-surface-variant text-right">Adolescents</span>
+<div class="flex-1 h-6 bg-surface-container rounded-sm overflow-hidden flex">
+<div class="h-full bg-secondary w-[70%] flex items-center px-2 text-[10px] text-on-secondary font-bold">Low</div>
+<div class="h-full bg-surface-tint w-[20%] flex items-center px-2 text-[10px] text-white font-bold">Med</div>
+<div class="h-full bg-error w-[10%] flex items-center px-2 text-[10px] text-on-error font-bold">High</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Correlation Matrix -->
+<div class="col-span-12 lg:col-span-6 bg-surface p-lg rounded-xl border border-outline-variant shadow-elevation-1 flex flex-col min-h-[300px]">
+<div class="flex justify-between items-center mb-md">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Physiological Correlation</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Signal relationship to stress events.</p>
+</div>
+</div>
+<div class="flex-1 flex items-center justify-center p-md">
+<div class="w-full max-w-sm">
+<div class="grid grid-cols-4 gap-1">
+<!-- Headers -->
+<div></div>
+<div class="text-[10px] font-label-sm text-on-surface-variant text-center rotate-45 origin-bottom-left ml-4">HRV</div>
+<div class="text-[10px] font-label-sm text-on-surface-variant text-center rotate-45 origin-bottom-left ml-4">EDA</div>
+<div class="text-[10px] font-label-sm text-on-surface-variant text-center rotate-45 origin-bottom-left ml-4">Temp</div>
+<!-- Row 1 -->
+<div class="text-[10px] font-label-sm text-on-surface-variant text-right pr-2 self-center">Stress</div>
+<div class="aspect-square bg-error/90 rounded-sm flex items-center justify-center text-[10px] text-white font-bold">0.89</div>
+<div class="aspect-square bg-error/70 rounded-sm flex items-center justify-center text-[10px] text-white font-bold">0.72</div>
+<div class="aspect-square bg-primary/20 rounded-sm flex items-center justify-center text-[10px] text-on-surface font-bold">0.15</div>
+<!-- Row 2 -->
+<div class="text-[10px] font-label-sm text-on-surface-variant text-right pr-2 self-center">Sleep</div>
+<div class="aspect-square bg-secondary/80 rounded-sm flex items-center justify-center text-[10px] text-white font-bold">-0.65</div>
+<div class="aspect-square bg-secondary/40 rounded-sm flex items-center justify-center text-[10px] text-on-surface font-bold">-0.32</div>
+<div class="aspect-square bg-primary/10 rounded-sm flex items-center justify-center text-[10px] text-on-surface font-bold">0.05</div>
+<!-- Row 3 -->
+<div class="text-[10px] font-label-sm text-on-surface-variant text-right pr-2 self-center">Activity</div>
+<div class="aspect-square bg-primary/40 rounded-sm flex items-center justify-center text-[10px] text-on-surface font-bold">0.42</div>
+<div class="aspect-square bg-primary/60 rounded-sm flex items-center justify-center text-[10px] text-white font-bold">0.58</div>
+<div class="aspect-square bg-error/30 rounded-sm flex items-center justify-center text-[10px] text-on-surface font-bold">0.28</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

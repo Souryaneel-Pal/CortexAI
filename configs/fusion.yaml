@@ -1,0 +1,69 @@
+# Fusion + multi-task head config (src/models/fusion.py, src/models/heads.py)
+# Gated cross-modal attention over the three 256-d modality embeddings, trained
+# anchored on the labelled tabular rows via weak-pairing (matched-emotion
+# sampling), never on fabricated face+voice+row triples.
+
+encoders:
+  face_checkpoint: artifacts/checkpoints/face/best.ckpt
+  speech_checkpoint: artifacts/checkpoints/speech/best.ckpt
+  tabular_checkpoint: artifacts/checkpoints/tabular/best.ckpt
+  embed_dim: 256
+  # Freeze the P1 baselines during fusion training (only the fusion block +
+  # heads train). If a checkpoint above is missing, the encoder is used with
+  # its random initialization instead and a warning is logged -- fusion.py
+  # itself is checkpoint-agnostic, this is purely a train_fusion.py concern.
+  freeze_pretrained: true
+  face_backbone: simple_cnn      # must match whatever configs/face.yaml was
+  speech_backbone: cnn_bilstm    # trained with, so the checkpoint loads cleanly
+  tabular_backbone: ft_transformer
+
+pairing:
+  strategy: weak_matched_emotion
+  # Each tabular row is paired at train time with a face image and speech
+  # clip whose emotion label projects (via emotion_stress_map.py) onto the
+  # same stress tier the row's own tabular-derived stress-priors suggest --
+  # never paired by a shared identity that doesn't exist in the data.
+  resample_pairs_every_epoch: true
+  tabular_only_fallback: true   # metrics always also reported tabular-only
+
+fusion:
+  type: gated_cross_modal_attention
+  n_layers: 2
+  n_heads: 8
+  hidden_dim: 256
+  modality_dropout_p: 0.15   # graceful degradation when a modality is missing
+  dropout: 0.2
+
+heads:
+  classification:
+    num_classes: 4
+    mc_dropout_passes: 20        # Monte-Carlo dropout for uncertainty
+  regression:
+    targets: [Depression_Score, Anxiety_Score, Stress_Score]
+    ranges:
+      Depression_Score: [0, 34]
+      Anxiety_Score: [0, 24]
+      Stress_Score: [0, 39]
+  consistency_loss_weight: 0.1   # score <-> predicted-class agreement term
+
+loss:
+  classification: class_balanced_focal
+  regression: huber
+  huber_delta: 1.0
+  task_weighting: uncertainty   # learned/uncertainty-based auto-balancing (Kendall et al.)
+
+conformal:
+  method: mapie
+  alpha: 0.1   # 90% coverage target
+  defer_to_human_below_confidence: 0.6
+
+train:
+  epochs: 50
+  optimizer: adamw
+  lr: 5.0e-4
+  weight_decay: 1.0e-4
+  scheduler: cosine
+  early_stopping_patience: 10
+  seed: 42
+
+checkpoint_dir: artifacts/checkpoints/fusion

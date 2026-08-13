@@ -1,0 +1,435 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>MindScope AI - New Assessment</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-primary-fixed": "#001e2f",
+                      "surface-container-lowest": "#ffffff",
+                      "inverse-on-surface": "#eaf1ff",
+                      "error-container": "#ffdad6",
+                      "surface-container-low": "#eff4ff",
+                      "on-surface-variant": "#3e4850",
+                      "on-tertiary-container": "#3e0097",
+                      "on-secondary-fixed-variant": "#005048",
+                      "on-surface": "#0b1c30",
+                      "surface-container-high": "#dce9ff",
+                      "tertiary-container": "#a986ff",
+                      "surface-tint": "#006591",
+                      "outline-variant": "#bec8d2",
+                      "on-primary-fixed-variant": "#004c6e",
+                      "on-background": "#0b1c30",
+                      "on-primary": "#ffffff",
+                      "on-tertiary": "#ffffff",
+                      "primary": "#006591",
+                      "on-secondary-fixed": "#00201c",
+                      "primary-fixed-dim": "#89ceff",
+                      "surface-variant": "#d3e4fe",
+                      "on-secondary": "#ffffff",
+                      "secondary-container": "#6df5e1",
+                      "surface": "#f8f9ff",
+                      "surface-bright": "#f8f9ff",
+                      "on-tertiary-fixed": "#23005c",
+                      "on-error-container": "#93000a",
+                      "secondary-fixed": "#71f8e4",
+                      "surface-dim": "#cbdbf5",
+                      "on-primary-container": "#003751",
+                      "primary-container": "#0ea5e9",
+                      "secondary": "#006b5f",
+                      "surface-container": "#e5eeff",
+                      "on-secondary-container": "#006f64",
+                      "error": "#ba1a1a",
+                      "inverse-surface": "#213145",
+                      "surface-container-highest": "#d3e4fe",
+                      "tertiary": "#6d3bd7",
+                      "on-error": "#ffffff",
+                      "primary-fixed": "#c9e6ff",
+                      "inverse-primary": "#89ceff",
+                      "tertiary-fixed": "#e9ddff",
+                      "outline": "#6e7881",
+                      "background": "#f8f9ff",
+                      "tertiary-fixed-dim": "#d0bcff",
+                      "on-tertiary-fixed-variant": "#5516be",
+                      "secondary-fixed-dim": "#4fdbc8"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "2xl": "48px",
+                      "3xl": "64px",
+                      "base": "4px",
+                      "md": "16px",
+                      "xl": "32px",
+                      "xs": "4px",
+                      "gutter": "24px",
+                      "lg": "24px",
+                      "sm": "8px",
+                      "margin-mobile": "16px",
+                      "margin-desktop": "40px"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "headline-sm": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "label-sm": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "JetBrains Mono"
+                      ],
+                      "display-lg": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-sm": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.04em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .shadow-ambient { box-shadow: 0 2px 4px rgba(11, 28, 48, 0.05); }
+        .ai-glow { box-shadow: 0 0 15px rgba(139, 92, 246, 0.15); }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen flex text-body-md">
+<!-- Side Navigation -->
+<nav aria-label="Sidebar Navigation" class="bg-surface h-screen w-72 flex-col fixed left-0 top-0 border-r border-outline-variant hidden md:flex">
+<div class="flex flex-col h-full p-lg gap-sm">
+<!-- Header/Brand -->
+<div class="flex items-center gap-md mb-xl">
+<div class="w-12 h-12 rounded-full overflow-hidden shrink-0 border border-outline-variant">
+<img alt="Dr. Julian Vance" class="w-full h-full object-cover" data-alt="A professional headshot of a mature male psychiatrist with a kind smile, wearing a neat blazer and glasses. Lighting is soft and bright, clinical yet approachable. Light blue background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmfx4gSai86YMUfs9_RuPQHfUc8lKbmbMlBTODkEUT1jeVCIDyNCUPE5bmlqFDLDJq2N9v8askjML3Q4-PA9TUUbi2YghxaGFg73OTJYkt0ZwTI-yISu5LYrAWDEVgcHm-GE9gL1tdLCKg_Y9J9aNMz-7YswPW2JKf-V1ZMcIfoPX62cLIDd5SptB5MdyqOAc4ufcNzQPum9zlQ24RLAMEF9wwdfXPbhWqjYJ2927aENmav8RmQhF7">
+</div>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md font-bold text-primary">MindScope AI</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Senior Psychiatrist</span>
+</div>
+</div>
+<!-- Primary CTA -->
+<button class="w-full flex justify-center items-center gap-sm bg-primary text-on-primary py-sm px-md rounded-full font-label-md text-label-md mb-md hover:bg-on-primary-fixed transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="add_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+                New Assessment
+            </button>
+<!-- Navigation Links -->
+<div class="flex flex-col gap-xs flex-1">
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm bg-surface-container-high text-primary rounded-lg font-bold hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+<span class="font-label-md text-label-md">New Assessment</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="fact_check">fact_check</span>
+<span class="font-label-md text-label-md">Results</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="font-label-md text-label-md">AI Insights</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+<span class="font-label-md text-label-md">Reports</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-label-md text-label-md">Analytics</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200 rounded-lg mt-auto" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+</div>
+</nav>
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col md:ml-72 min-h-screen">
+<!-- Top App Bar -->
+<header class="bg-surface/80 backdrop-blur-md docked full-width top-0 sticky z-40 border-b border-outline-variant shadow-sm flex justify-between items-center h-16 px-gutter">
+<div class="flex items-center gap-md">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface md:hidden">MindScope AI</span>
+</div>
+<div class="flex items-center gap-md">
+<!-- Actions -->
+<button class="text-on-surface-variant hover:bg-surface-container rounded-full p-2 transition-all">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container rounded-full p-2 transition-all">
+<span class="material-symbols-outlined" data-icon="swap_horiz">swap_horiz</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant ml-sm cursor-pointer hover:ring-2 hover:ring-primary hover:ring-offset-2 transition-all">
+<img alt="Clinician Profile" class="w-full h-full object-cover" data-alt="Small circular profile picture of a clinician, bright lighting, professional." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6kEG1WWiIRw-4lVJyQNTrLleHmKEO2MAKLWcDeQwWYs8vkJu6Pq6rKR9ZEPgAykVaWrDXFapnzB_EaiMqqRKFbEeY_ogmJD1uPfWD8U4cvDTQUTJdpn2vJUEEosVlui7S3PB2bhBGA63fZEy-dZY9J9pk5KEDWkXadkyJgRc6V8y0cW3aE_wUvBVcyvg2m4Inn11VL_Xh04gmWs7jNJbpQ5WYDJYaX5cMBLytmP8yUuPtDNA-Re2c">
+</div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 p-margin-mobile md:p-margin-desktop max-w-[1440px] mx-auto w-full flex flex-col gap-xl">
+<!-- Page Header -->
+<div class="flex flex-col gap-xs">
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">New Multimodal Assessment</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">Follow the three steps below to gather patient data. The AI will analyze facial expressions, vocal tonality, and self-reported metrics to generate a comprehensive psychiatric insight report.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+<!-- Step 1 & 2 Column (Media Inputs) -->
+<div class="lg:col-span-1 flex flex-col gap-lg">
+<!-- Step 1: Facial Analysis -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-ambient flex flex-col gap-md relative overflow-hidden group">
+<div class="flex items-center gap-sm">
+<div class="w-6 h-6 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-label-sm text-label-sm">1</div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Facial Analysis</h2>
+</div>
+<div class="border-2 border-dashed border-outline-variant rounded-lg p-xl flex flex-col items-center justify-center gap-md bg-surface-container-low hover:bg-surface-container transition-colors cursor-pointer group-hover:border-primary-fixed-dim min-h-[200px]">
+<span class="material-symbols-outlined text-outline text-4xl" data-icon="videocam">videocam</span>
+<div class="text-center">
+<p class="font-body-sm text-body-sm text-on-surface">Drag &amp; drop video file or click to browse</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-xs">or</p>
+</div>
+<button class="bg-surface-container-highest text-on-surface px-md py-sm rounded-md font-label-md text-label-md border border-outline-variant hover:bg-primary hover:text-on-primary transition-all">Start Webcam</button>
+</div>
+<!-- Detected Emotions Bar (Placeholder for active state) -->
+<div class="flex flex-col gap-xs mt-sm opacity-50">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Detected Signals (Awaiting Media)</span>
+<div class="flex gap-xs w-full h-2 rounded-full overflow-hidden bg-surface-variant">
+<div class="bg-secondary-container w-[10%]"></div>
+<div class="bg-primary-container w-[20%]"></div>
+<div class="bg-tertiary-container w-[70%]"></div>
+</div>
+<div class="flex justify-between font-label-sm text-label-sm text-outline text-[10px]">
+<span class="">Happy</span>
+<span class="">Sad</span>
+<span class="">Neutral</span>
+</div>
+</div>
+</section>
+<!-- Step 2: Speech Analysis -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-ambient flex flex-col gap-md relative overflow-hidden group">
+<div class="flex items-center gap-sm">
+<div class="w-6 h-6 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-label-sm text-label-sm">2</div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Speech Analysis</h2>
+</div>
+<div class="border-2 border-dashed border-outline-variant rounded-lg p-xl flex flex-col items-center justify-center gap-md bg-surface-container-low hover:bg-surface-container transition-colors cursor-pointer group-hover:border-primary-fixed-dim min-h-[160px]">
+<span class="material-symbols-outlined text-outline text-4xl" data-icon="mic">mic</span>
+<div class="text-center">
+<p class="font-body-sm text-body-sm text-on-surface">Upload audio file</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-xs">or</p>
+</div>
+<button class="bg-surface-container-highest text-on-surface px-md py-sm rounded-md font-label-md text-label-md border border-outline-variant hover:bg-primary hover:text-on-primary transition-all">Record Audio</button>
+</div>
+<!-- Waveform Placeholder -->
+<div class="h-12 w-full bg-surface-variant rounded flex items-center justify-center opacity-30 mt-sm">
+<span class="font-label-sm text-label-sm text-outline">Waveform Ready</span>
+</div>
+</section>
+</div>
+<!-- Step 3 Column (Metrics Form) -->
+<div class="lg:col-span-2">
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-ambient flex flex-col gap-md h-full">
+<div class="flex items-center gap-sm mb-sm">
+<div class="w-6 h-6 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-label-sm text-label-sm">3</div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Clinical Metrics Input</h2>
+</div>
+<form class="grid grid-cols-1 md:grid-cols-2 gap-lg flex-1">
+<!-- Behavioral -->
+<div class="flex flex-col gap-md p-md bg-surface-container-low rounded-lg border border-surface-variant">
+<h3 class="font-label-md text-label-md text-primary flex items-center gap-xs border-b border-outline-variant pb-xs">
+<span class="material-symbols-outlined" data-icon="person_play">person_play</span> Behavioral
+                                </h3>
+<div class="flex flex-col gap-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Sleep Quality (1-10)</label>
+<input class="w-full bg-surface rounded border-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container text-body-sm font-body-sm px-sm py-xs text-on-surface" max="10" min="1" type="number">
+</div>
+<div class="flex flex-col gap-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Social Engagement Level</label>
+<select class="w-full bg-surface rounded border-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container text-body-sm font-body-sm px-sm py-xs text-on-surface">
+<option>Select level...</option>
+<option>High</option>
+<option>Moderate</option>
+<option>Low</option>
+<option>Isolated</option>
+</select>
+</div>
+</div>
+<!-- Physiological -->
+<div class="flex flex-col gap-md p-md bg-surface-container-low rounded-lg border border-surface-variant">
+<h3 class="font-label-md text-label-md text-primary flex items-center gap-xs border-b border-outline-variant pb-xs">
+<span class="material-symbols-outlined" data-icon="favorite">favorite</span> Physiological
+                                </h3>
+<div class="flex flex-col gap-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Heart Rate (bpm)</label>
+<input class="w-full bg-surface rounded border-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container text-body-sm font-body-sm px-sm py-xs text-on-surface" placeholder="e.g., 72" type="number">
+</div>
+<div class="flex flex-col gap-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant">GSR Baseline (μS)</label>
+<input class="w-full bg-surface rounded border-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container text-body-sm font-body-sm px-sm py-xs text-on-surface" placeholder="e.g., 2.4" type="text">
+</div>
+</div>
+<!-- Facial (Manual Override/Notes) -->
+<div class="flex flex-col gap-md p-md bg-surface-container-low rounded-lg border border-surface-variant">
+<h3 class="font-label-md text-label-md text-primary flex items-center gap-xs border-b border-outline-variant pb-xs">
+<span class="material-symbols-outlined" data-icon="visibility">visibility</span> Facial Observables
+                                </h3>
+<div class="flex flex-col gap-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Blink Rate (per min)</label>
+<input class="w-full bg-surface rounded border-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container text-body-sm font-body-sm px-sm py-xs text-on-surface" type="number">
+</div>
+<div class="flex flex-col gap-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Eye Contact Quality</label>
+<select class="w-full bg-surface rounded border-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container text-body-sm font-body-sm px-sm py-xs text-on-surface">
+<option>Normal</option>
+<option>Avoidant</option>
+<option>Staring</option>
+</select>
+</div>
+</div>
+<!-- Speech (Manual Override/Notes) -->
+<div class="flex flex-col gap-md p-md bg-surface-container-low rounded-lg border border-surface-variant">
+<h3 class="font-label-md text-label-md text-primary flex items-center gap-xs border-b border-outline-variant pb-xs">
+<span class="material-symbols-outlined" data-icon="graphic_eq">graphic_eq</span> Speech Characteristics
+                                </h3>
+<div class="flex flex-col gap-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Pitch Variability</label>
+<select class="w-full bg-surface rounded border-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container text-body-sm font-body-sm px-sm py-xs text-on-surface">
+<option>Monotone</option>
+<option>Normal</option>
+<option>Highly Variable</option>
+</select>
+</div>
+<div class="flex flex-col gap-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Speech Rate</label>
+<select class="w-full bg-surface rounded border-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container text-body-sm font-body-sm px-sm py-xs text-on-surface">
+<option>Slow</option>
+<option>Normal</option>
+<option>Pressured/Fast</option>
+</select>
+</div>
+</div>
+</form>
+</section>
+</div>
+</div>
+<!-- Global Action Footer -->
+<div class="mt-xl pt-lg border-t border-outline-variant flex justify-between items-center"><div class="flex-1 flex flex-col gap-xs mr-auto max-w-md">
+    <div class="flex items-center gap-sm">
+        <span class="material-symbols-outlined text-primary animate-spin text-body-md" style="font-size: 18px;">progress_activity</span>
+        <span class="font-label-md text-label-md text-on-surface-variant">AI Models Initializing...</span>
+    </div>
+    <div class="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden">
+        <div class="h-full bg-primary rounded-full w-1/3 animate-pulse"></div>
+    </div>
+</div>
+<button class="bg-gradient-to-r from-tertiary to-primary-container text-on-primary px-3xl py-md rounded-lg font-headline-sm text-headline-sm ai-glow hover:opacity-90 transition-opacity flex items-center gap-sm">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+                    Run AI Assessment
+                </button>
+</div>
+</main>
+</div>
+
+
+</body></html>

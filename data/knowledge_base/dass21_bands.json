@@ -1,0 +1,92 @@
+[
+  {
+    "id": "band-depression-normal",
+    "text": "Depression_Score in the range 0-7 (of this dataset's 0-34 scale) is interpreted as the Normal/Healthy band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-34 Depression_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-depression-mild",
+    "text": "Depression_Score in the range 7-14 (of this dataset's 0-34 scale) is interpreted as the Mild band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-34 Depression_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-depression-moderate",
+    "text": "Depression_Score in the range 14-20 (of this dataset's 0-34 scale) is interpreted as the Moderate band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-34 Depression_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-depression-severe",
+    "text": "Depression_Score in the range 20-27 (of this dataset's 0-34 scale) is interpreted as the Severe band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-34 Depression_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-depression-extremely-severe",
+    "text": "Depression_Score in the range 27-34 (of this dataset's 0-34 scale) is interpreted as the Extremely Severe band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-34 Depression_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-anxiety-normal",
+    "text": "Anxiety_Score in the range 0-5 (of this dataset's 0-24 scale) is interpreted as the Normal/Healthy band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-24 Anxiety_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-anxiety-mild",
+    "text": "Anxiety_Score in the range 5-10 (of this dataset's 0-24 scale) is interpreted as the Mild band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-24 Anxiety_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-anxiety-moderate",
+    "text": "Anxiety_Score in the range 10-14 (of this dataset's 0-24 scale) is interpreted as the Moderate band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-24 Anxiety_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-anxiety-severe",
+    "text": "Anxiety_Score in the range 14-19 (of this dataset's 0-24 scale) is interpreted as the Severe band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-24 Anxiety_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-anxiety-extremely-severe",
+    "text": "Anxiety_Score in the range 19-24 (of this dataset's 0-24 scale) is interpreted as the Extremely Severe band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-24 Anxiety_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-stress-normal",
+    "text": "Stress_Score in the range 0-8 (of this dataset's 0-39 scale) is interpreted as the Normal/Healthy band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-39 Stress_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-stress-mild",
+    "text": "Stress_Score in the range 8-16 (of this dataset's 0-39 scale) is interpreted as the Mild band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-39 Stress_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-stress-moderate",
+    "text": "Stress_Score in the range 16-23 (of this dataset's 0-39 scale) is interpreted as the Moderate band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-39 Stress_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-stress-severe",
+    "text": "Stress_Score in the range 23-31 (of this dataset's 0-39 scale) is interpreted as the Severe band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-39 Stress_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  },
+  {
+    "id": "band-stress-extremely-severe",
+    "text": "Stress_Score in the range 31-39 (of this dataset's 0-39 scale) is interpreted as the Extremely Severe band -- illustrative placeholder cut-point, not a published norm table.",
+    "source": "Placeholder proportional band over this project's own 0-39 Stress_Score scale -- see data/knowledge_base/README.md",
+    "category": "score_band"
+  }
+]

@@ -1,0 +1,55 @@
+# Speech encoder config (src/models/speech_net.py)
+# Wav2Vec2-base fine-tuned for emotion. Fallback: CNN-BiLSTM over log-Mel + SpecAugment.
+modality: speech
+
+data:
+  root: data/raw/speech
+  sample_rate: 16000
+  max_duration_sec: 4.0   # RAVDESS clips are pad/truncated to this for batching
+  num_classes: 8
+  batch_size: 16
+  num_workers: 4
+  val_split: 0.15
+  test_split: 0.15
+  # RAVDESS carries no participant/session ID beyond actor -- split by actor to
+  # avoid speaker leakage between train/val/test.
+  split_by: actor_id
+
+model:
+  backbone: wav2vec2   # wav2vec2 | cnn_bilstm (fallback)
+  pretrained_checkpoint: facebook/wav2vec2-base
+  embed_dim: 256
+  dropout: 0.3
+  freeze_feature_extractor: true
+
+  # CNN-BiLSTM fallback params (used only when backbone: cnn_bilstm)
+  fallback:
+    n_mels: 64
+    cnn_channels: [32, 64, 128]
+    lstm_hidden: 128
+    lstm_layers: 2
+    bidirectional: true
+
+imbalance:
+  strategy: class_balanced_focal   # addresses RAVDESS Neutral 96 vs others 192
+  focal_gamma: 2.0
+  class_balanced_beta: 0.999
+
+augment:
+  spec_augment: true
+  freq_mask_param: 15
+  time_mask_param: 25
+
+train:
+  epochs: 40
+  optimizer: adamw
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  scheduler: cosine
+  early_stopping_patience: 8
+  seed: 42
+
+explain:
+  ig_steps: 50   # Integrated Gradients interpolation steps
+
+checkpoint_dir: artifacts/checkpoints/speech
