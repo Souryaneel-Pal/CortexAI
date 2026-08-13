@@ -1,5 +1,5 @@
 from src.data.loaders import FacialEmotionDataset, SpeechEmotionDataset, TabularMentalHealthDataset
-from src.data.schemas import TABULAR_FEATURE_COLUMNS
+from src.data.schemas import STRESS_LABEL_NAME_TO_LEVEL, StressLevel, TABULAR_FEATURE_COLUMNS
 
 
 def test_facial_dataset_loads_all_classes(synthetic_facial_dir):
@@ -49,18 +49,51 @@ def test_tabular_dataset_loads_expected_shape(synthetic_tabular_csv):
     features, label, scores = ds[0]
     assert features.shape == (len(TABULAR_FEATURE_COLUMNS),)
     assert scores.shape == (3,)
-    assert label in ("Healthy", "Mild_Stress", "Moderate_Stress", "Severe_Stress")
+    # Labels collate straight into a loss function, so they are integer
+    # StressLevel indices; the raw strings stay on `.raw_labels` / `.df`.
+    assert int(label) in {int(level) for level in StressLevel}
+    assert ds.raw_labels[0] in ("Healthy", "Mild_Stress", "Moderate_Stress", "Severe_Stress")
+
+
+def test_tabular_dataset_labels_align_with_raw_strings(synthetic_tabular_csv):
+    ds = TabularMentalHealthDataset(synthetic_tabular_csv)
+    for encoded, raw in zip(ds.labels, ds.raw_labels):
+        assert int(encoded) == int(STRESS_LABEL_NAME_TO_LEVEL[raw])
+
+
+def test_tabular_dataset_indices_subset_selects_rows(synthetic_tabular_csv):
+    import numpy as np
+
+    full = TabularMentalHealthDataset(synthetic_tabular_csv)
+    subset = TabularMentalHealthDataset(synthetic_tabular_csv, indices=np.array([2, 5, 7]))
+    assert len(subset) == 3
+    assert np.allclose(subset.features[0], full.features[2])
+    assert int(subset.labels[1]) == int(full.labels[5])
 
 
 def test_facial_dataset_missing_path_raises_clear_error(tmp_path):
     import pytest
 
-    with pytest.raises(FileNotFoundError, match="not been supplied yet"):
+    with pytest.raises(FileNotFoundError, match="Dataset Access"):
         FacialEmotionDataset(tmp_path / "does_not_exist")
 
 
 def test_tabular_dataset_missing_path_raises_clear_error(tmp_path):
     import pytest
 
-    with pytest.raises(FileNotFoundError, match="not been supplied yet"):
+    with pytest.raises(FileNotFoundError, match="Dataset Access"):
         TabularMentalHealthDataset(tmp_path / "missing.csv")
+
+
+def test_speech_dataset_deduplicates_repeated_clips(synthetic_speech_dir, tmp_path):
+    """The shipped archive nests a byte-identical copy of every Actor_XX
+    folder under `audio_speech_actors_01-24/`; the loader must not count it
+    twice (2,880 files on disk, 1,440 unique clips)."""
+    import shutil
+
+    root = tmp_path / "Audios"
+    shutil.copytree(synthetic_speech_dir, root / "Actor_01")
+    shutil.copytree(synthetic_speech_dir, root / "audio_speech_actors_01-24" / "Actor_01")
+
+    ds = SpeechEmotionDataset(root)
+    assert len(ds) == 15  # not 30 -- the duplicate copy is dropped by filename

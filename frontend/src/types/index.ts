@@ -174,12 +174,9 @@ export interface PopulationAnalyticsData {
 }
 
 export interface AssessmentDraft {
-  sleepQuality: number | ''
-  socialEngagement: string
-  heartRate: number | ''
-  gsrBaseline: string
-  blinkRate: number | ''
-  eyeContactQuality: string
-  pitchVariability: string
-  speechRate: string
+  Sleep_Quality: number | ''
+  Social_Engagement: number | ''
+  Heart_Rate_BPM: number | ''
+  GSR_Level: number | ''
+  Eye_Blink_Rate: number | ''
 }

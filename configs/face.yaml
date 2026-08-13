@@ -3,7 +3,7 @@
 modality: facial
 
 data:
-  root: data/raw/facial
+  root: data/raw/Extracted_images
   image_size: 48
   num_classes: 7
   batch_size: 64
@@ -23,6 +23,10 @@ imbalance:
   strategy: class_balanced_focal   # class_balanced_focal | oversample | none
   focal_gamma: 2.0
   class_balanced_beta: 0.999
+  # FER is 16.5x imbalanced (Disgust 436 vs Happy 7215); loss weighting alone
+  # leaves whole epochs where the minority is barely sampled, so a balanced
+  # sampler is layered on top here. Off for speech -- see configs/speech.yaml.
+  use_balanced_sampler: true
 
 train:
   epochs: 30

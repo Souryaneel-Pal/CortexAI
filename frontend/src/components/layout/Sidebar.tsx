@@ -10,13 +10,17 @@ import { DECISION_SUPPORT_SIDEBAR } from '../../lib/responsibleAI'
  * "Results" / "Settings" are inert here.
  */
 export function Sidebar() {
+  const userJson = sessionStorage.getItem('auth_user')
+  const user = userJson ? JSON.parse(userJson) : null
+  const isAdmin = user && user.role === 'Admin'
+
   return (
     <nav
       aria-label="Primary"
       className="hidden md:flex h-screen w-72 flex-col fixed left-0 top-0 z-50 border-r border-outline-variant bg-surface p-lg gap-sm"
     >
       {/* Brand */}
-      <Link to="/" className="mb-xl flex items-center gap-md px-sm">
+      <Link to="/dashboard" className="mb-xl flex items-center gap-md px-sm">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-container/20">
           <MaterialIcon name="psychology" filled className="text-primary" />
         </div>
@@ -42,7 +46,7 @@ export function Sidebar() {
             <NavLink
               key={item.id}
               to={item.path}
-              end={item.path === '/'}
+              end={item.path === '/dashboard'}
               className={({ isActive }) =>
                 `flex items-center gap-md rounded-lg px-md py-sm font-label-md text-label-md transition-colors duration-200 ${
                   isActive
@@ -65,13 +69,22 @@ export function Sidebar() {
             </span>
           ),
         )}
-        <span
-          title="Not part of this conversion pass"
-          className="mt-auto flex cursor-not-allowed items-center gap-md rounded-lg px-md py-sm font-label-md text-label-md text-on-surface-variant/50"
-        >
-          <MaterialIcon name={SETTINGS_ITEM.icon} />
-          <span>{SETTINGS_ITEM.label}</span>
-        </span>
+        
+        {isAdmin && SETTINGS_ITEM.path && (
+          <NavLink
+            to={SETTINGS_ITEM.path}
+            className={({ isActive }) =>
+              `mt-auto flex items-center gap-md rounded-lg px-md py-sm font-label-md text-label-md transition-colors duration-200 ${
+                isActive
+                  ? 'bg-surface-container-high font-bold text-primary'
+                  : 'text-on-surface-variant hover:bg-surface-container-low hover:text-primary'
+              }`
+            }
+          >
+            <MaterialIcon name={SETTINGS_ITEM.icon} />
+            <span>{SETTINGS_ITEM.label}</span>
+          </NavLink>
+        )}
       </div>
 
       {/* Decision-support framing — present on every page, per PROJECT_PLAN.md */}
@@ -86,16 +99,33 @@ export function Sidebar() {
       </div>
 
       {/* User Profile */}
-      <div className="mt-sm flex items-center gap-md border-t border-outline-variant pt-lg">
-        <img
-          alt="Dr. Julian Vance"
-          className="h-10 w-10 rounded-full object-cover"
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQzNLcxqLRYAI0qAsSjVNGHWEhs85aLpxcnrjkMaHlENhJ-hEiJzXec1RjRwObFfegHcHJlJJmcXd9gxfX_ed2q_o69r7X_3E5mNf-XcFhB6UqRlFRKB3drOUhQeuXg-79wG_ZRDrjw64yWyrHv8rfQZHThuqc8uveb75B_XAa_Ogi2RdVUZYDFKqnhKvw-WTN9GJJHW7mRillDqMxfbLk_SoEkHE9cir2jDLUUEDKEgoInwgwa7l6"
-        />
-        <div>
-          <p className="font-label-md text-label-md font-bold text-on-surface">Dr. Julian Vance</p>
-          <p className="font-label-sm text-label-sm text-on-surface-variant">Senior Psychiatrist</p>
+      <div className="mt-sm flex items-center justify-between border-t border-outline-variant pt-lg">
+        <div className="flex items-center gap-md">
+          <img
+            alt={user?.name || "Dr. Julian Vance"}
+            className="h-10 w-10 rounded-full object-cover"
+            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQzNLcxqLRYAI0qAsSjVNGHWEhs85aLpxcnrjkMaHlENhJ-hEiJzXec1RjRwObFfegHcHJlJJmcXd9gxfX_ed2q_o69r7X_3E5mNf-XcFhB6UqRlFRKB3drOUhQeuXg-79wG_ZRDrjw64yWyrHv8rfQZHThuqc8uveb75B_XAa_Ogi2RdVUZYDFKqnhKvw-WTN9GJJHW7mRillDqMxfbLk_SoEkHE9cir2jDLUUEDKEgoInwgwa7l6"
+          />
+          <div>
+            <p className="font-label-md text-label-md font-bold text-on-surface truncate max-w-[120px]">
+              {user?.name || "Dr. Julian Vance"}
+            </p>
+            <p className="font-label-sm text-label-sm text-on-surface-variant">
+              {user?.role || "Clinician"}
+            </p>
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            sessionStorage.clear()
+            window.location.href = '/'
+          }}
+          title="Sign Out"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-outline-variant hover:bg-surface-container text-on-surface-variant hover:text-error transition-colors"
+        >
+          <MaterialIcon name="logout" className="text-[18px]" />
+        </button>
       </div>
     </nav>
   )

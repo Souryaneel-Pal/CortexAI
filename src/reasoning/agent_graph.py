@@ -26,7 +26,7 @@ from typing import Any, Callable, TypedDict
 
 from src.data.schemas import StressLevel
 from src.explain.masked_distress import DEFAULT_MDI_FLAG_THRESHOLD
-from src.reasoning.rag_report import ReportResult, generate_report
+from src.reasoning.rag_report import ReportResult, generate_report_ollama
 from src.reasoning.retriever import ClinicalKBRetriever
 
 CRISIS_TRIGGER_CLASS = int(StressLevel.SEVERE_STRESS)
@@ -56,7 +56,10 @@ class AgentContext:
     uncertainty_fn: Callable[[dict], dict]
     explain_fn: Callable[[dict, dict], dict]
     retriever: ClinicalKBRetriever
-    report_fn: Callable[[dict, list[dict]], ReportResult] = field(default=generate_report)
+    #: Local `llama3.1` via Ollama by default. It degrades to a templated
+    #: report on its own (see src/reasoning/rag_report.py), so no node in this
+    #: graph has to handle "the LLM is down" as a special case.
+    report_fn: Callable[[dict, list[dict]], ReportResult] = field(default=generate_report_ollama)
     top_k_docs: int = 4
 
 
@@ -120,6 +123,11 @@ def build_agent_graph(context: AgentContext):
         report = context.report_fn(prediction, state["retrieved_docs"])
         return {"report": report, "log": _log(state, f"report: cached={getattr(report, 'cached', None)}")}
 
+    def should_continue(state: AgentState):
+        if state.get("generate_report", True):
+            return "retrieve"
+        return END
+
     graph = StateGraph(AgentState)
     graph.add_node("preprocess", preprocess_node)
     graph.add_node("predict", predict_node)
@@ -132,7 +140,14 @@ def build_agent_graph(context: AgentContext):
     graph.add_edge("preprocess", "predict")
     graph.add_edge("predict", "uncertainty_gate")
     graph.add_edge("uncertainty_gate", "explain")
-    graph.add_edge("explain", "retrieve")
+    graph.add_conditional_edges(
+        "explain",
+        should_continue,
+        {
+            "retrieve": "retrieve",
+            END: END
+        }
+    )
     graph.add_edge("retrieve", "report")
     graph.add_edge("report", END)
 

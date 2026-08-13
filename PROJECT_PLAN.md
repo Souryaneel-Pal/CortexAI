@@ -13,22 +13,49 @@ hackathon clock with a multi-person team; this build runs as a single async engi
 session instead, so phases are ordered by dependency, not by clock time, and are worked
 **phase by phase, committing incrementally per phase**.
 
-## Known constraint, logged up front
+## Status: datasets landed, models trained
 
-This sandbox has **no GPU** and **no dataset files** (`data/raw/` is empty but
-git-ignored and ready to receive them — see `.gitignore`). The Google Drive dataset link in `1.docx` is
-blocked by this environment's network egress policy. Per explicit direction: **the user will
-supply the datasets** (FER images, RAVDESS clips, the 4000-row tabular CSV) directly into
-`data/raw/`. Until then:
-- Every module is written to be **spec-correct and immediately runnable** against the real
-  data the moment it lands — nothing is a placeholder stub.
-- Tests and pipeline smoke-checks run against small **synthetic fixtures** that match the
-  real schema exactly (same column names, same image/audio shapes, same filename
-  convention), so the mechanics (shapes, losses, metric computation, API contracts) are
-  proven correct without fabricating real training results.
-- No metric numbers are ever reported as final/trained results until they come from a run
-  against the real data. Anywhere a number would be shown before that (demo/UI), it is
-  clearly labeled as mock/sample data, not a claimed result.
+The constraint logged below has been **resolved**. All three datasets are now present
+under `data/raw/` (`Extracted_images/` 28,709 images, `Audios/` 1,440 unique clips,
+`mental_health_multimodal.csv` 4,000 rows — counts verified against
+`Dataset_Description.docx`), and every encoder plus the fusion stack has been **trained
+on Apple-silicon MPS**. Checkpoints live in `artifacts/checkpoints/` (git-ignored);
+the API serves them and reports `is_demo_untrained_model: false`.
+
+Measured results, the ablation, the fairness audit, and the one finding that changes how
+all of it should be read — **the 18 tabular features do not predict their targets**
+(max |r| = 0.046; GBDT macro-F1 0.219 vs 0.270 for a stratified random guess; negative
+R² on all three scores) — are written up in `README.md` under "Measured results".
+
+Three data issues found and handled during the run, recorded so they aren't rediscovered:
+
+1. **`Audios/` ships every clip twice** — `audio_speech_actors_01-24/` is a byte-identical
+   copy of the `Actor_XX/` folders (2,880 files, 1,440 unique, verified by md5).
+   `SpeechEmotionDataset` de-duplicates by RAVDESS filename.
+2. **Speech must be split by actor, not by clip.** 24 actors speak the same two sentences;
+   a random clip-level split puts the same speaker on both sides and measures speaker
+   memorisation. `build_dataloaders_speech` holds out whole actors, an even number of them
+   so the val split stays gender-balanced for the fairness audit.
+3. **Fusion validation must not use matched-emotion pairing.** Pairing keys the sampled
+   face/voice on the row's ground-truth label, so it encodes the answer. Training uses it
+   (it is the documented anchored-training prior); validation uses
+   `FusionPairDataset(pair_by_label=False)`.
+
+### Original constraint (historical)
+
+This sandbox had **no GPU** and **no dataset files**. The Google Drive dataset link in
+`1.docx` was blocked by this environment's network egress policy, and the user supplied
+the datasets directly into `data/raw/`. Until they landed:
+- Every module was written to be **spec-correct and immediately runnable** against the real
+  data the moment it landed — nothing is a placeholder stub.
+- Tests and pipeline smoke-checks ran against small **synthetic fixtures** matching the
+  real schema exactly (same column names, image/audio shapes, filename convention), so the
+  mechanics (shapes, losses, metric computation, API contracts) were proven correct
+  without fabricating real training results. Those fixtures are still the basis of the
+  131-test suite.
+- No metric numbers were reported as trained results until they came from a run against
+  the real data. Anywhere a number is shown without a live session (demo/UI), it is still
+  clearly labeled as sample data, not a claimed result.
 
 ## Source documents (`./docs/`)
 

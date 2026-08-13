@@ -14,16 +14,11 @@ def test_fusion_pair_dataset_matches_stress_tiers(
     assert len(pair_ds) == len(tabular_ds)
 
     idx_to_facial_name = {v: k for k, v in {name: idx for idx, name in FACIAL_EMOTIONS.items()}.items()}
-    stress_label_to_tier = {
-        "Healthy": StressLevel.HEALTHY,
-        "Mild_Stress": StressLevel.MILD_STRESS,
-        "Moderate_Stress": StressLevel.MODERATE_STRESS,
-        "Severe_Stress": StressLevel.SEVERE_STRESS,
-    }
 
     for i in range(len(pair_ds)):
         features, label, scores, image, waveform = pair_ds[i]
-        row_tier = stress_label_to_tier[label]
+        # `label` is already an integer StressLevel index.
+        row_tier = StressLevel(int(label))
 
         facial_idx = pair_ds._facial_pairs[i]
         _source, facial_label_idx = facial_ds.samples[facial_idx]
@@ -67,3 +62,37 @@ def test_fusion_pair_dataset_batches_via_default_collate(
     assert features.shape[1] == 18
     assert images.shape[1:] == (1, 48, 48)
     assert waveforms.ndim == 2
+
+
+def test_validation_pairing_is_label_independent(
+    synthetic_tabular_csv, synthetic_facial_dir, synthetic_speech_dir
+):
+    """`pair_by_label=False` is what makes the fusion val metric honest.
+
+    Matched-emotion pairing keys the sampled face/voice on the row's
+    ground-truth label, so media paired that way *encodes the answer*. That
+    is a fine training-time prior but scoring a val split paired the same
+    way measures the model's ability to read the leak. The val regime must
+    therefore draw media independently of the label -- across a whole
+    dataset the paired tiers must NOT all match the row tier.
+    """
+    tabular_ds = TabularMentalHealthDataset(synthetic_tabular_csv)
+    facial_ds = FacialEmotionDataset(synthetic_facial_dir)
+    speech_ds = SpeechEmotionDataset(synthetic_speech_dir)
+
+    pair_ds = FusionPairDataset(
+        tabular_ds, facial_ds, speech_ds, seed=0, pair_by_label=False
+    )
+    idx_to_facial_name = {idx: name for idx, name in FACIAL_EMOTIONS.items()}
+
+    matches = 0
+    for i in range(len(pair_ds)):
+        row_tier = StressLevel(int(tabular_ds.labels[i]))
+        _source, facial_label_idx = facial_ds.samples[pair_ds._facial_pairs[i]]
+        if FACIAL_EMOTION_TO_STRESS[idx_to_facial_name[facial_label_idx]] == row_tier:
+            matches += 1
+
+    assert matches < len(pair_ds), (
+        "label-independent pairing still matched every row's tier -- the val "
+        "split would inherit the training-time label leak"
+    )

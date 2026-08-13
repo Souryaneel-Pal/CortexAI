@@ -33,12 +33,23 @@ dice-ml>=0.9
 mapie>=1.0.0
 
 # --- RAG, Vector Search & LLM ---
-langchain>=0.1.0
-langchain-community>=0.0.10
+# The reasoning stack runs locally on Ollama: `llama3.1` writes the cited
+# narratives, `nomic-embed-text` embeds the clinical KB. Install Ollama
+# separately (https://ollama.com), then:
+#     ollama pull llama3.1
+#     ollama pull nomic-embed-text
+# If Ollama is unreachable the API degrades to a templated report and TF-IDF
+# retrieval rather than failing -- see src/reasoning/ollama_config.py.
+langchain-ollama>=0.2.0
 langgraph>=0.0.30
 faiss-cpu>=1.7.4
-sentence-transformers>=2.2.2
-anthropic>=0.18.0
+sentence-transformers>=2.2.2   # fallback embedding backend
+anthropic>=0.18.0              # optional hosted-report generator
+
+# NOTE: `langchain` and `langchain-community` are deliberately NOT pinned here.
+# Nothing under src/ imports them (only `langgraph` and `langchain_ollama` are
+# used), and keeping them installed forces langchain-core back to <1.0, which
+# conflicts with the version langchain-ollama requires.
 
 # --- API & Serving ---
 fastapi>=0.100.0

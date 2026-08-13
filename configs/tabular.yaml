@@ -4,7 +4,7 @@
 modality: tabular
 
 data:
-  csv_path: data/raw/numerical.csv
+  csv_path: data/raw/mental_health_multimodal.csv
   num_classes: 4
   num_score_targets: 3
   batch_size: 128

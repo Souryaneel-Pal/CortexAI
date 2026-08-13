@@ -154,10 +154,13 @@ class FaceEmotionEncoder(nn.Module):
 
     @property
     def gradcam_target_layer(self) -> nn.Module:
-        """The conv layer Grad-CAM should hook -- the CBAM-attended feature map,
-        so heatmaps reflect the attention-focused regions.
+        """The conv layer Grad-CAM should hook -- the last convolutional block
+        of the EfficientNet-B0 backbone (or the CBAM block for simple_cnn).
         """
-        return self.feature_extractor.cbam
+        if self.backbone_name == "efficientnet_b0":
+            return self.feature_extractor.backbone.blocks[6]
+        else:
+            return self.feature_extractor.cbam
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """x: (B, 1, 48, 48) grayscale batch. Returns (embedding[B,256], logits[B,7])."""

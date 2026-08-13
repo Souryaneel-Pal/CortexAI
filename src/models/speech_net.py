@@ -27,6 +27,7 @@ class Wav2Vec2EmotionEncoder(nn.Module):
         pretrained_checkpoint: str = "facebook/wav2vec2-base",
         freeze_feature_extractor: bool = True,
         dropout: float = 0.3,
+        normalize_input: bool = True,
     ):
         super().__init__()
         from transformers import Wav2Vec2Model
@@ -34,6 +35,15 @@ class Wav2Vec2EmotionEncoder(nn.Module):
         self.wav2vec2 = Wav2Vec2Model.from_pretrained(pretrained_checkpoint)
         if freeze_feature_extractor:
             self.wav2vec2.feature_extractor._freeze_parameters()
+
+        # facebook/wav2vec2-base ships with `do_normalize=True`: its
+        # Wav2Vec2FeatureExtractor zero-means and unit-variances each waveform
+        # before the model sees it. We feed waveforms straight from the
+        # Dataset rather than through that processor, so the same
+        # normalisation has to happen here -- without it the pretrained
+        # features are fed off-distribution input and the model plateaus at
+        # chance (measured: 13.3% accuracy, i.e. one constant class).
+        self.normalize_input = normalize_input
 
         hidden_size = self.wav2vec2.config.hidden_size
         self.embed_proj = nn.Sequential(
@@ -45,6 +55,10 @@ class Wav2Vec2EmotionEncoder(nn.Module):
 
     def forward(self, waveform: torch.Tensor, attention_mask: torch.Tensor | None = None):
         """waveform: (B, T) raw 16kHz audio. Returns (embedding[B,256], logits[B,8])."""
+        if self.normalize_input:
+            mean = waveform.mean(dim=-1, keepdim=True)
+            std = waveform.std(dim=-1, keepdim=True)
+            waveform = (waveform - mean) / (std + 1e-7)
         outputs = self.wav2vec2(waveform, attention_mask=attention_mask)
         pooled = outputs.last_hidden_state.mean(dim=1)  # mean pool over time
         embedding = self.embed_proj(pooled)
@@ -68,12 +82,24 @@ class CNNBiLSTMEncoder(nn.Module):
         lstm_layers: int = 2,
         bidirectional: bool = True,
         dropout: float = 0.3,
+        spec_augment: bool = True,
+        freq_mask_param: int = 15,
+        time_mask_param: int = 25,
     ):
         super().__init__()
         self.melspec = torchaudio.transforms.MelSpectrogram(
             sample_rate=sample_rate, n_mels=n_mels, n_fft=400, hop_length=160
         )
         self.amplitude_to_db = torchaudio.transforms.AmplitudeToDB()
+
+        # SpecAugment (configs/speech.yaml `augment.spec_augment`) masks
+        # time and frequency bands of the log-Mel spectrogram. It lives here
+        # rather than in the Dataset because the spectrogram is computed in
+        # this forward pass, and it is gated on `self.training` so validation
+        # and inference always see unmasked spectrograms.
+        self.spec_augment = spec_augment
+        self.freq_masking = torchaudio.transforms.FrequencyMasking(freq_mask_param=freq_mask_param)
+        self.time_masking = torchaudio.transforms.TimeMasking(time_mask_param=time_mask_param)
 
         channels = [1, *cnn_channels]
         conv_blocks = []
@@ -109,6 +135,8 @@ class CNNBiLSTMEncoder(nn.Module):
     def forward(self, waveform: torch.Tensor):
         """waveform: (B, T) raw audio. Returns (embedding[B,256], logits[B,8])."""
         spec = self.amplitude_to_db(self.melspec(waveform))  # (B, n_mels, n_frames)
+        if self.spec_augment and self.training:
+            spec = self.time_masking(self.freq_masking(spec))
         x = spec.unsqueeze(1)  # (B, 1, n_mels, n_frames)
         for block in self.conv_blocks:
             x = block(x)

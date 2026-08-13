@@ -60,7 +60,14 @@ def test_health_endpoint(client):
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert body["is_demo_untrained_model"] is True  # no checkpoints in this sandbox
+    # Whether checkpoints exist depends on whether training has been run, so
+    # this asserts the flag is *correct*, not that it has one fixed value:
+    # it must be False exactly when every served module loaded real weights.
+    # (An earlier version hardcoded `is True`, which encoded "this sandbox has
+    # no checkpoints" and started failing the moment the models were trained.)
+    from src.api.main import pipeline
+
+    assert body["is_demo_untrained_model"] == (not all(pipeline.loaded_modules.values()))
 
 
 def test_assess_tabular_only(client):
@@ -71,8 +78,20 @@ def test_assess_tabular_only(client):
     assert 0.0 <= body["confidence"] <= 1.0
     assert set(body["scores"].keys()) == {"Depression_Score", "Anxiety_Score", "Stress_Score"}
     assert abs(sum(body["modality_weights"].values()) - 1.0) < 1e-3
-    assert body["is_demo_untrained_model"] is True
+    assert isinstance(body["is_demo_untrained_model"], bool)
     assert "decision-support" in body["disclaimer"].lower()
+
+    # Scores must land inside their documented ranges regardless of training
+    # state -- RegressionHead scales a sigmoid by each target's max, so an
+    # out-of-range score means that clamping regressed.
+    assert 0.0 <= body["scores"]["Depression_Score"] <= 34.0
+    assert 0.0 <= body["scores"]["Anxiety_Score"] <= 24.0
+    assert 0.0 <= body["scores"]["Stress_Score"] <= 39.0
+
+    # Tabular-only request: no face or clip was sent, so the emotion
+    # distributions must be empty rather than a softmax over a zero tensor.
+    assert body["face_emotion_probs"] == {}
+    assert body["speech_emotion_probs"] == {}
 
 
 def test_assess_with_all_three_modalities(client):
@@ -101,12 +120,46 @@ def test_full_session_flow_assess_explain_report_followup(client):
     explain_response = client.get(f"/explain/{session_id}")
     assert explain_response.status_code == 200
     explain_body = explain_response.json()
-    assert len(explain_body["top_shap_features"]) <= 5
+    assert len(explain_body["top_shap_features"]) <= 8
+
+    # Signed SHAP covers all 18 features and carries direction, which the
+    # mean|SHAP| ranking discards -- the UI's diverging bar chart needs it.
+    assert len(explain_body["signed_shap"]) == 18
+    assert any(f["shap"] < 0 for f in explain_body["signed_shap"]) or any(
+        f["shap"] > 0 for f in explain_body["signed_shap"]
+    )
+
+    # Grad-CAM: a face was supplied, so a displayable overlay must come back.
+    gradcam = explain_body["gradcam"]
+    assert gradcam is not None
+    assert len(gradcam["heatmap"]) == 48 and len(gradcam["heatmap"][0]) == 48
+    assert all(0.0 <= v <= 1.0 for row in gradcam["heatmap"] for v in row)
+    assert base64.b64decode(gradcam["overlay_png_base64"])[:8] == b"\x89PNG\r\n\x1a\n"
+
+    # Integrated Gradients over the waveform, pooled to frames.
+    audio_ig = explain_body["audio_integrated_gradients"]
+    assert audio_ig is not None
+    assert audio_ig["frame_importance"]
+    assert all(0.0 <= v <= 1.0 for v in audio_ig["frame_importance"])
+
+    # Both modalities present, so the Masked-Distress Index is computable.
+    mdi = explain_body["masked_distress_index"]
+    assert 0.0 <= mdi["mdi"] <= 1.0
+    assert "unavailable_reason" not in mdi
+
+    weights = explain_body["modality_weights"]
+    assert abs(weights["face"] + weights["speech"] + weights["tabular"] - 1.0) < 1e-4
 
     report_response = client.get(f"/report/{session_id}")
     assert report_response.status_code == 200
     report_body = report_response.json()
-    assert report_body["cached"] is True  # no ANTHROPIC_API_KEY in this sandbox
+    # `cached` depends on whether a local Ollama is up on this machine, so
+    # assert the invariant instead of one environment's answer: a templated
+    # report always states why it degraded, a live one never claims to have.
+    assert isinstance(report_body["cached"], bool)
+    assert (report_body["fallback_reason"] is not None) == report_body["cached"]
+    # Either way the report is cited and carries the responsible-AI framing.
+    assert report_body["citations"]
     assert "decision-support" in report_body["disclaimer"].lower()
 
     followup_response = client.post(
@@ -131,3 +184,55 @@ def test_counterfactual_endpoint(client):
     # actionable feature flips it) -- just check the response is well-formed.
     body = cf_response.json()
     assert "counterfactual" in body and "narrative" in body
+
+
+def test_predict_alias_matches_assess(client):
+    """`/predict` and `/assess` are the same handler; clients reach for either."""
+    payload = {"tabular_features": _sample_tabular_features()}
+
+    assess = client.post("/assess", json=payload)
+    predict = client.post("/predict", json=payload)
+
+    assert assess.status_code == predict.status_code == 200
+    assert set(assess.json().keys()) == set(predict.json().keys())
+    # Same schema and same class; session_id differs per call by design.
+    assert predict.json()["predicted_class"] in ("Healthy", "Mild_Stress", "Moderate_Stress", "Severe_Stress")
+
+
+def test_health_reports_local_reasoning_stack(client):
+    """The UI warns before an assessment that the narrative may be templated,
+    so /health has to describe the local Ollama stack."""
+    body = client.get("/health").json()
+    reasoning = body["reasoning"]
+
+    assert set(reasoning) >= {
+        "ollama_reachable",
+        "base_url",
+        "llm_model",
+        "llm_available",
+        "embedding_model",
+        "embedding_available",
+        "retrieval_backend",
+    }
+    assert isinstance(reasoning["ollama_reachable"], bool)
+    assert reasoning["llm_model"] == "llama3.1"
+    assert reasoning["embedding_model"] == "nomic-embed-text"
+    # Retrieval always resolves to *some* working backend.
+    assert reasoning["retrieval_backend"] in ("ollama", "sentence_transformers", "tfidf")
+    # When a model is missing the detail must be actionable, not just a flag.
+    if not reasoning["llm_available"] or not reasoning["embedding_available"]:
+        assert reasoning["detail"]
+
+
+def test_report_declares_its_generator(client):
+    """A templated fallback must never be mistaken for a model-written
+    narrative: the response says which generator ran, and why if it degraded."""
+    session_id = client.post("/assess", json={"tabular_features": _sample_tabular_features()}).json()["session_id"]
+    body = client.get(f"/report/{session_id}").json()
+
+    assert body["generator"] in ("template",) or body["generator"].startswith(("ollama:", "anthropic:"))
+    # cached=True means templated, which must always carry a stated reason.
+    assert body["cached"] is (body["generator"] == "template")
+    if body["cached"]:
+        assert body["fallback_reason"]
+    assert body["citations"]

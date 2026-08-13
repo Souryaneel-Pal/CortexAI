@@ -13,8 +13,10 @@ encoders:
   # its random initialization instead and a warning is logged -- fusion.py
   # itself is checkpoint-agnostic, this is purely a train_fusion.py concern.
   freeze_pretrained: true
-  face_backbone: simple_cnn      # must match whatever configs/face.yaml was
-  speech_backbone: cnn_bilstm    # trained with, so the checkpoint loads cleanly
+  # These must match whatever configs/face.yaml and configs/speech.yaml were
+  # trained with, so the P1 checkpoints load cleanly into the fusion module.
+  face_backbone: efficientnet_b0
+  speech_backbone: wav2vec2
   tabular_backbone: ft_transformer
 
 pairing:
@@ -59,6 +61,8 @@ conformal:
 
 train:
   epochs: 50
+  batch_size: 32
+  num_workers: 4
   optimizer: adamw
   lr: 5.0e-4
   weight_decay: 1.0e-4

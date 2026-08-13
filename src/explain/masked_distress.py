@@ -88,6 +88,7 @@ def masked_distress_index(
     speech_emotion_probs: dict[str, float],
     physiological_row: dict[str, float],
     reference: PhysiologicalReferenceStats,
+    threshold: float = DEFAULT_MDI_FLAG_THRESHOLD,
 ) -> dict:
     """Returns {"mdi": float in [0,1], "face_calm": float, "voice_high_arousal":
     float, "physio_high_arousal": float, "flag": bool, "dominant_contradiction":
@@ -112,6 +113,6 @@ def masked_distress_index(
         "face_calm": face_calm,
         "voice_high_arousal": voice_high_arousal,
         "physio_high_arousal": physio_high_arousal,
-        "flag": mdi >= DEFAULT_MDI_FLAG_THRESHOLD,
+        "flag": mdi >= threshold,
         "dominant_contradiction": dominant,
     }

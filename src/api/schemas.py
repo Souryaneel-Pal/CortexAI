@@ -57,6 +57,8 @@ class AssessmentRequest(BaseModel):
     tabular_features: TabularFeaturesIn
     face_image_base64: str | None = Field(default=None, description="PNG/JPEG, base64-encoded, 48x48 grayscale preferred")
     speech_audio_base64: str | None = Field(default=None, description="WAV, base64-encoded, 16kHz preferred")
+    patient_id: str | None = Field(default=None, description="Patient identifier")
+    demographic: str | None = Field(default=None, description="Demographic segment (Adults, Seniors, Adolescents)")
 
 
 class ModalityWeights(BaseModel):
@@ -81,23 +83,57 @@ class PredictionResponse(BaseModel):
     session_id: str
     predicted_class: str
     confidence: float
+    class_probs: list[float] = Field(
+        default_factory=list,
+        description="MC-dropout mean probability per class, index-aligned to "
+        "StressLevel (0=Healthy, 1=Mild, 2=Moderate, 3=Severe).",
+    )
     scores: ScoreBreakdown
     modality_weights: ModalityWeights
+    face_emotion_probs: dict[str, float] = Field(
+        default_factory=dict, description="7-way FER emotion distribution; empty when no face was supplied."
+    )
+    speech_emotion_probs: dict[str, float] = Field(
+        default_factory=dict, description="8-way RAVDESS emotion distribution; empty when no clip was supplied."
+    )
     uncertainty: UncertaintyInfo
     deferred_to_human: bool
     is_demo_untrained_model: bool = Field(
-        description="True when the underlying encoders have no trained checkpoint loaded "
-        "(this sandbox has none -- see PROJECT_PLAN.md). The numbers above are structurally "
-        "valid but not a real clinical signal in that case."
+        description="True when any module on the served path has no trained checkpoint loaded. "
+        "The numbers above are structurally valid but not a real signal in that case."
     )
     disclaimer: str = DECISION_SUPPORT_DISCLAIMER
+
+
+class GradCAMPayload(BaseModel):
+    """Face Grad-CAM, pre-rendered server-side so the client just displays it."""
+
+    overlay_png_base64: str = Field(description="PNG (base64) of the heatmap blended over the submitted face")
+    heatmap: list[list[float]] = Field(description="Raw 48x48 CAM in [0,1], for clients that render their own")
+    target_layer: str
+    predicted_emotion: str
+
+
+class AudioIGPayload(BaseModel):
+    """Integrated-Gradients attribution over the waveform, pooled to frames."""
+
+    frame_importance: list[float] = Field(description="Per-frame |attribution|, peak-normalised to [0,1]")
+    frame_ms: float
+    predicted_emotion: str
 
 
 class ExplanationResponse(BaseModel):
     session_id: str
     top_shap_features: list[dict]
+    signed_shap: list[dict] = Field(
+        default_factory=list,
+        description="Signed SHAP for this row: positive raises predicted severity, negative lowers it.",
+    )
     modality_weights: ModalityWeights
     masked_distress_index: dict | None
+    gradcam: GradCAMPayload | None = None
+    audio_integrated_gradients: AudioIGPayload | None = None
+    is_demo_untrained_model: bool = False
     disclaimer: str = DECISION_SUPPORT_DISCLAIMER
 
 
@@ -113,6 +149,15 @@ class ReportResponse(BaseModel):
     narrative: str
     citations: list[str]
     cached: bool
+    generator: str = Field(
+        default="template",
+        description="Which generator wrote this: 'ollama:llama3.1', 'anthropic:<model>', or 'template'.",
+    )
+    fallback_reason: str | None = Field(
+        default=None,
+        description="Set when the local LLM was unavailable and a templated summary was served "
+        "instead. Shown to the user so a template is never mistaken for a model-written narrative.",
+    )
     disclaimer: str = DECISION_SUPPORT_DISCLAIMER
 
 
@@ -126,4 +171,24 @@ class FollowUpResponse(BaseModel):
     answer: str
     citations: list[str]
     cached: bool
+    generator: str = "template"
+    fallback_reason: str | None = None
     disclaimer: str = DECISION_SUPPORT_DISCLAIMER
+
+
+class ReasoningStatus(BaseModel):
+    """State of the local Ollama reasoning stack, surfaced on /health so the
+    UI can warn before an assessment rather than after the report degrades.
+    """
+
+    ollama_reachable: bool
+    base_url: str
+    llm_model: str
+    llm_available: bool
+    embedding_model: str
+    embedding_available: bool
+    retrieval_backend: str | None = None
+    vector_index: str | None = None
+    detail: str | None = Field(
+        default=None, description="Actionable message when something is missing (e.g. `ollama pull ...`)."
+    )

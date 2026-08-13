@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Bar,
   BarChart,
@@ -17,15 +18,13 @@ import { CrisisResourcesCard } from '../components/ui/CrisisResourcesCard'
 import { getExplainabilityData } from '../lib/mockData'
 import { chartColors } from '../lib/chartColors'
 import { useAssessment } from '../lib/assessmentContext'
+import { MaterialIcon } from '../components/ui/MaterialIcon'
 
 const MODALITY_COLOR: Record<string, string> = {
   Physiological: chartColors.primaryContainer,
   Facial: chartColors.secondary,
   Behavioral: chartColors.tertiary,
   Speech: chartColors.outlineVariant,
-  // Label used for the tabular stream in a live session: the 18 columns span
-  // behavioural, facial-derived, acoustic and physiological signals, so
-  // calling it "Physiological" alone would understate what it covers.
   'Behavioral & Physiological': chartColors.primaryContainer,
 }
 
@@ -46,15 +45,21 @@ function pct(value: number): number {
   return Math.round(value * 100)
 }
 
-export function ExplainableInsights() {
+export function Results() {
+  const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
   const data = getExplainabilityData(expanded)
 
-  const { prediction, explanation, faceImageDataUrl, completedAt } = useAssessment()
+  const { prediction, explanation, faceImageDataUrl, completedAt, generateReport, phase, running } = useAssessment()
 
-  // In a live session every chart below is driven by the model's own output;
-  // with no session the page keeps rendering the illustrative sample data it
-  // always has, behind the SampleDataBadge. The two are never mixed.
+  async function handleGenerateReport() {
+    if (!prediction) return
+    const res = await generateReport(prediction.session_id)
+    if (res) {
+      navigate('/reports')
+    }
+  }
+
   const shapChart = explanation?.signed_shap?.length
     ? [...explanation.signed_shap]
         .sort((a, b) => Math.abs(b.shap) - Math.abs(a.shap))
@@ -75,7 +80,6 @@ export function ExplainableInsights() {
     ? prediction.predicted_class === 'Severe_Stress' || Boolean(mdi?.flag)
     : data.summary.headline.includes('high likelihood')
 
-  // SHAP magnitudes are model-scale, not the [-1, 1] the sample chart assumes.
   const shapDomain: [number, number] = explanation?.signed_shap?.length
     ? (() => {
         const peak = Math.max(...shapChart.map((d) => Math.abs(d.value)), 1e-6)
@@ -84,11 +88,11 @@ export function ExplainableInsights() {
     : [-1, 1]
 
   return (
-    <AppShell title="Explainable AI (XAI) Flagship">
-      <div className="mb-xl flex flex-col gap-sm md:flex-row md:items-center md:justify-between">
+    <AppShell title="Assessment Results">
+      <div className="mb-xl flex flex-col gap-md md:flex-row md:items-center md:justify-between border-b border-outline-variant pb-md">
         <div>
           <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-xs">
-            Patient Assessment Analysis
+            Diagnostic Result Details
           </h2>
           <p className="font-body-lg text-body-lg text-on-surface-variant">
             {prediction ? (
@@ -104,15 +108,40 @@ export function ExplainableInsights() {
             )}
           </p>
         </div>
-        {prediction ? (
-          prediction.is_demo_untrained_model && (
-            <span className="flex items-center gap-xs rounded-full border border-outline-variant bg-surface-container px-md py-xs font-label-sm text-label-sm text-on-surface-variant">
-              Untrained model — output not a real signal
-            </span>
-          )
-        ) : (
-          <SampleDataBadge />
-        )}
+
+        {/* Generate Report Action */}
+        <div className="flex items-center gap-md">
+          {prediction && (
+            <button
+              type="button"
+              onClick={handleGenerateReport}
+              disabled={running || phase === 'reporting'}
+              className="ai-glow flex items-center justify-center gap-sm rounded-lg bg-gradient-to-r from-tertiary to-primary-container px-xl py-sm font-label-md text-label-md text-on-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {phase === 'reporting' ? (
+                <>
+                  <MaterialIcon name="progress_activity" className="animate-spin text-[18px]" />
+                  Generating Clinical Report...
+                </>
+              ) : (
+                <>
+                  <MaterialIcon name="clinical_notes" className="text-[18px]" />
+                  Generate Clinical Report
+                </>
+              )}
+            </button>
+          )}
+
+          {prediction ? (
+            prediction.is_demo_untrained_model && (
+              <span className="flex items-center gap-xs rounded-full border border-outline-variant bg-surface-container px-md py-xs font-label-sm text-label-sm text-on-surface-variant">
+                Untrained model
+              </span>
+            )
+          ) : (
+            <SampleDataBadge />
+          )}
+        </div>
       </div>
 
       {prediction && (
@@ -199,10 +228,10 @@ export function ExplainableInsights() {
           )}
         </InsightBanner>
 
-        {/* Grad-CAM + Masked-Distress Index (live sessions only) */}
+        {/* Grad-CAM */}
         {explanation?.gradcam && (
           <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-1">
-            <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Facial Grad-CAM</h3>
+            <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Facial Attention Mapping (Grad-CAM)</h3>
             <div className="flex items-center justify-center gap-md">
               {faceImageDataUrl && (
                 <figure className="flex flex-col items-center gap-xs">
@@ -217,7 +246,7 @@ export function ExplainableInsights() {
               <figure className="flex flex-col items-center gap-xs">
                 <img
                   src={`data:image/png;base64,${explanation.gradcam.overlay_png_base64}`}
-                  alt="Grad-CAM attribution heatmap over the submitted face"
+                  alt="Grad-CAM attribution heatmap"
                   className="h-32 w-32 rounded-lg border border-outline-variant object-cover"
                 />
                 <figcaption className="font-label-sm text-label-sm text-on-surface-variant">Attribution</figcaption>
@@ -230,10 +259,11 @@ export function ExplainableInsights() {
           </div>
         )}
 
+        {/* MDI */}
         {mdi && !mdi.unavailable_reason && (
           <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-2">
             <div className="mb-md flex items-center justify-between">
-              <h3 className="font-headline-sm text-headline-sm text-on-surface">Masked-Distress Index</h3>
+              <h3 className="font-headline-sm text-headline-sm text-on-surface">Masked-Distress Index (MDI)</h3>
               <span
                 className={`rounded-full px-md py-xs font-label-sm text-label-sm ${
                   mdi.flag ? 'bg-error/10 text-error' : 'bg-secondary/10 text-secondary'
@@ -272,8 +302,7 @@ export function ExplainableInsights() {
               ))}
             </div>
             <p className="mt-md border-t border-outline-variant pt-sm font-label-sm text-label-sm italic text-on-surface-variant">
-              MDI is high only when the face reads calm while voice or physiology read high-arousal — the masked-distress
-              presentation a self-report questionnaire misses.
+              MDI is high only when the face reads calm while voice or physiology read high-arousal.
               {mdi.dominant_contradiction && ` Driven here by ${mdi.dominant_contradiction}.`}
             </p>
           </div>
@@ -282,7 +311,7 @@ export function ExplainableInsights() {
         {/* Feature Importance (SHAP) */}
         <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-2">
           <div className="mb-md flex items-center justify-between">
-            <h3 className="font-headline-sm text-headline-sm text-on-surface">Feature Importance (SHAP Values)</h3>
+            <h3 className="font-headline-sm text-headline-sm text-on-surface">Attribution Analysis (SHAP Values)</h3>
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
@@ -322,7 +351,7 @@ export function ExplainableInsights() {
 
         {/* Modality Contribution Donut */}
         <div className="flex flex-col rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-1">
-          <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Modality Contribution</h3>
+          <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Contribution Weights by Modality</h3>
           <div className="relative flex flex-1 items-center justify-center py-md">
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
@@ -349,7 +378,7 @@ export function ExplainableInsights() {
               <span className="font-label-sm text-label-sm text-on-surface-variant">Modalities</span>
             </div>
           </div>
-          <div className="mt-auto grid grid-cols-2 gap-sm pt-sm">
+          <div className="mt-auto grid grid-cols-2 gap-sm pt-sm border-t border-outline-variant/30">
             {modalityContribution.map((m) => (
               <div key={m.modality} className="flex items-center gap-xs">
                 <div className="h-3 w-3 rounded" style={{ background: MODALITY_COLOR[m.modality] }} />
@@ -361,11 +390,11 @@ export function ExplainableInsights() {
           </div>
         </div>
 
-        {/* Speech Integrated Gradients (live sessions only) */}
+        {/* Speech Integrated Gradients */}
         {explanation?.audio_integrated_gradients && (
           <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-3">
             <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">
-              Speech Attribution (Integrated Gradients)
+              Acoustic Attribution Timeline (Integrated Gradients)
             </h3>
             <div className="flex h-24 items-end gap-[2px]">
               {explanation.audio_integrated_gradients.frame_importance.map((v, i) => (
@@ -382,7 +411,6 @@ export function ExplainableInsights() {
               <span>
                 Frames driving the{' '}
                 <span className="text-primary">{explanation.audio_integrated_gradients.predicted_emotion}</span> reading
-                ({explanation.audio_integrated_gradients.frame_ms.toFixed(0)} ms per bar)
               </span>
               <span>
                 {(
@@ -397,7 +425,7 @@ export function ExplainableInsights() {
 
         {/* Detailed Breakdown Table */}
         <div className="rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1 lg:col-span-3">
-          <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Detailed Modality Breakdown</h3>
+          <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Categorical Signal Diagnostics</h3>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left">
               <thead>
@@ -410,7 +438,7 @@ export function ExplainableInsights() {
               </thead>
               <tbody>
                 {data.breakdown.map((row) => (
-                  <tr key={row.modality} className="border-b border-outline-variant transition-colors last:border-b-0 hover:bg-surface-container-low">
+                  <tr key={row.modality} className="border-b border-outline-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
                     <td className="px-md py-md font-body-sm text-body-sm text-on-surface">{row.modality}</td>
                     <td className="px-md py-md font-label-sm text-label-sm" style={{ color: MODALITY_COLOR[row.modality] }}>
                       {row.keyIndicator}

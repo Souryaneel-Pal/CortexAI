@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -14,8 +15,11 @@ import {
 import { AppShell } from '../components/layout/AppShell'
 import { MaterialIcon } from '../components/ui/MaterialIcon'
 import { SampleDataBadge } from '../components/ui/SampleDataBadge'
-import { getPopulationAnalyticsData } from '../lib/mockData'
+import { getAnalytics, type AnalyticsData } from '../lib/api'
 import { chartColors } from '../lib/chartColors'
+import { useAssessment } from '../lib/assessmentContext'
+
+const CLASS_LABELS = ['Healthy', 'Mild', 'Moderate', 'Severe']
 
 const HEATMAP_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const HEATMAP_HOURS = ['2A', '4A', '6A', '8A', '10A', '12P', '2P', '4P', '6P', '8P', '10P', '12A']
@@ -27,10 +31,144 @@ function heatCellColor(intensity: number) {
 }
 
 export function PopulationAnalytics() {
-  const data = getPopulationAnalyticsData()
+  const [data, setData] = useState<AnalyticsData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [errorState, setErrorState] = useState<string | null>(null)
+
+  useEffect(() => {
+    getAnalytics()
+      .then((res) => {
+        setData(res)
+        setLoading(false)
+      })
+      .catch((err) => {
+        setErrorState(err instanceof Error ? err.message : 'Failed to load analytics data')
+        setLoading(false)
+      })
+  }, [])
+
+  const { prediction, explanation, running, phaseLabel, error, backendReachable } = useAssessment()
+
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex flex-col items-center gap-md">
+            <MaterialIcon name="progress_activity" className="animate-spin text-4xl text-primary" />
+            <span className="font-label-md text-label-md text-on-surface-variant">Loading analytics data...</span>
+          </div>
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (errorState || !data) {
+    return (
+      <AppShell>
+        <div className="flex h-[400px] flex-col items-center justify-center gap-md">
+          <MaterialIcon name="error" className="text-4xl text-error" />
+          <span className="font-label-md text-label-md text-error">{errorState || 'No analytics data available'}</span>
+        </div>
+      </AppShell>
+    )
+  }
+
+  // The cohort panels on this page stay sample data. A single assessment is
+  // not a population, and deriving a heatmap, a risk-segment breakdown or a
+  // correlation matrix from one session would be fabrication -- so the live
+  // session gets its own clearly-scoped panel instead of being averaged into
+  // charts that imply a cohort behind them.
+  const classProbs = prediction?.class_probs ?? []
+  const probBars = classProbs.map((p, i) => ({ label: CLASS_LABELS[i] ?? `Class ${i}`, pct: Math.round(p * 100) }))
+  const modalityBars = explanation
+    ? [
+        { label: 'Signals', pct: Math.round(explanation.modality_weights.tabular * 100) },
+        { label: 'Face', pct: Math.round(explanation.modality_weights.face * 100) },
+        { label: 'Speech', pct: Math.round(explanation.modality_weights.speech * 100) },
+      ]
+    : []
 
   return (
     <AppShell title="Executive Analytics" showSearch searchPlaceholder="Search analytics...">
+      {(running || error || backendReachable === false) && (
+        <div
+          role="status"
+          className={`mb-lg flex items-center gap-sm rounded-xl border px-lg py-md shadow-level-1 ${
+            error || backendReachable === false
+              ? 'border-error/40 bg-error/10'
+              : 'border-outline-variant bg-surface-container-lowest'
+          }`}
+        >
+          <MaterialIcon
+            name={error || backendReachable === false ? 'error' : 'progress_activity'}
+            className={`text-[20px] ${error || backendReachable === false ? 'text-error' : 'animate-spin text-primary'}`}
+          />
+          <span
+            className={`font-label-md text-label-md ${
+              error || backendReachable === false ? 'text-error' : 'text-on-surface-variant'
+            }`}
+          >
+            {error ?? (backendReachable === false ? 'Cannot reach the CortexAI API.' : phaseLabel)}
+          </span>
+        </div>
+      )}
+
+      {prediction && (
+        <section className="mb-lg rounded-xl border border-outline-variant bg-surface p-lg shadow-level-1">
+          <div className="mb-md flex flex-wrap items-center justify-between gap-sm">
+            <h3 className="font-headline-sm text-headline-sm text-on-surface">Current Session (live model output)</h3>
+            <span className="font-label-sm text-label-sm text-on-surface-variant">
+              Session {prediction.session_id.slice(0, 8)}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
+            <div>
+              <h4 className="mb-sm font-label-md text-label-md text-on-surface-variant">
+                Class probability (MC-dropout mean)
+              </h4>
+              <div className="flex flex-col gap-sm">
+                {probBars.map((b) => (
+                  <div key={b.label}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-body-sm text-body-sm text-on-surface-variant">{b.label}</span>
+                      <span className="font-label-md text-label-md text-on-surface">{b.pct}%</span>
+                    </div>
+                    <div className="mt-xs h-2 w-full overflow-hidden rounded-full bg-surface-container">
+                      <div className="h-full bg-primary" style={{ width: `${b.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h4 className="mb-sm font-label-md text-label-md text-on-surface-variant">
+                Modality contribution (fusion gate)
+              </h4>
+              <div className="flex flex-col gap-sm">
+                {modalityBars.map((b) => (
+                  <div key={b.label}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-body-sm text-body-sm text-on-surface-variant">{b.label}</span>
+                      <span className="font-label-md text-label-md text-on-surface">{b.pct}%</span>
+                    </div>
+                    <div className="mt-xs h-2 w-full overflow-hidden rounded-full bg-surface-container">
+                      <div className="h-full bg-secondary" style={{ width: `${b.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+                {!explanation && (
+                  <span className="font-label-sm text-label-sm text-on-surface-variant">
+                    Explanations unavailable for this session.
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <p className="mt-md border-t border-outline-variant pt-sm font-label-sm text-label-sm italic text-on-surface-variant">
+            The cohort panels below remain sample data — a single assessment is not a population.
+          </p>
+        </section>
+      )}
       {/* Filters & Controls Bar */}
       <div className="mb-lg flex flex-col items-start justify-between gap-md rounded-xl border border-outline-variant bg-surface p-md shadow-level-1 sm:flex-row sm:items-center">
         <div className="flex flex-wrap items-center gap-md">
@@ -177,7 +315,7 @@ export function PopulationAnalytics() {
                   fillOpacity={0.25}
                   strokeWidth={2}
                 />
-                <Tooltip formatter={(v: number) => [`${v}`, 'Frequency']} />
+                <Tooltip formatter={(v) => [`${Number(v)}`, 'Frequency']} />
               </RadarChart>
             </ResponsiveContainer>
           </div>
@@ -201,7 +339,7 @@ export function PopulationAnalytics() {
                   axisLine={false}
                   tickLine={false}
                 />
-                <Tooltip formatter={(v: number, name: string) => [`${v}%`, name]} />
+                <Tooltip formatter={(v, name) => [`${Number(v)}%`, String(name)]} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="low" stackId="risk" name="Low" fill={chartColors.secondary} radius={[4, 0, 0, 4]} barSize={24} />
                 <Bar dataKey="medium" stackId="risk" name="Medium" fill={chartColors.primary} barSize={24} />

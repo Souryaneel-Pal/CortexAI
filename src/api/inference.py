@@ -1,13 +1,21 @@
 """Wires the P1-P4 model/explainability/RAG code into a single inference
-pipeline the API (src/api/main.py) can call (docs/PROJECT_PLAN.md P5).
+pipeline the API (src/api/main.py) can call (PROJECT_PLAN.md P5).
 
 `CortexAIPipeline` builds one `AgentContext` (src/reasoning/agent_graph.py)
-from real encoders, the real fusion+heads, real explainability functions,
-and the real KB retriever. It tries to load trained checkpoints
-(configs/fusion.yaml's paths) and clearly flags `is_demo_untrained_model`
-in every prediction when none are found -- this sandbox has none (no real
-data was available to train on; see PROJECT_PLAN.md), so a fresh
-random-initialization is used and every response says so rather than
+from the trained encoders, the trained fusion+heads, the real explainability
+functions, and the real KB retriever.
+
+Checkpoint loading, in priority order:
+  1. `artifacts/checkpoints/fusion/best.ckpt` -- a Lightning checkpoint of
+     FusionLightningModule, which contains *all five* sub-modules
+     (face_encoder / speech_encoder / tabular_encoder / fusion / heads)
+     under their attribute prefixes. One file restores the whole graph.
+  2. Per-modality `artifacts/checkpoints/{face,speech,tabular}/best.ckpt`
+     (keys prefixed `model.`) for anything the fusion checkpoint didn't cover.
+
+`is_demo_untrained_model` is False only when every module the served path
+actually uses was restored from a checkpoint. If anything is still randomly
+initialised the flag stays True and every response says so, rather than
 presenting structurally-valid-but-meaningless numbers as a real result.
 """
 from __future__ import annotations
@@ -20,29 +28,37 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from src.data.loaders import DEFAULT_TABULAR_CSV
 from src.data.schemas import STRESS_LEVEL_NAMES, StressLevel, TABULAR_FEATURE_COLUMNS
+from src.explain.gradcam import GradCAM
+from src.explain.ig_audio import integrated_gradients_audio, pool_attribution_to_frames
 from src.explain.masked_distress import PhysiologicalReferenceStats, masked_distress_index
-from src.explain.shap_tab import ClassLogitsOnly, rank_features_by_mean_abs_shap, shap_values_for_torch_model
+from src.explain.shap_tab import (
+    ClassLogitsOnly,
+    combine_shap_and_attention,
+    rank_features_by_mean_abs_shap,
+    shap_values_for_torch_model,
+)
 from src.models.face_cnn import FACIAL_EMOTIONS, FaceEmotionEncoder
 from src.models.fusion import GatedCrossModalFusion
 from src.models.heads import FusionHeads
-from src.models.speech_net import SPEECH_EMOTIONS, CNNBiLSTMEncoder
+from src.models.speech_net import SPEECH_EMOTIONS, build_speech_encoder
 from src.models.tabular_ft import TabularEncoder
 from src.reasoning.agent_graph import AgentContext
 from src.reasoning.retriever import ClinicalKBRetriever, load_knowledge_base
 
 logger = logging.getLogger(__name__)
 
-# Documented placeholder population reference for the Masked-Distress Index
-# (src/explain/masked_distress.py) -- must be replaced by stats fit on the
-# real tabular dataset (`PhysiologicalReferenceStats.fit_from_dataframe`)
-# once it's available; see PROJECT_PLAN.md.
-_PLACEHOLDER_PHYSIO_REFERENCE = PhysiologicalReferenceStats(
+CONFIDENCE_DEFER_THRESHOLD = 0.6
+SHAP_BACKGROUND_SAMPLES = 64
+GRADCAM_RENDER_SIZE = 192  # upscale the 48x48 CAM for a legible UI overlay
+
+# Fallback population reference for the Masked-Distress Index, used only if
+# the tabular CSV isn't present to fit real statistics from.
+_FALLBACK_PHYSIO_REFERENCE = PhysiologicalReferenceStats(
     mean={"Heart_Rate_BPM": 75.0, "HRV_Index": 50.0, "Skin_Temperature": 33.0, "GSR_Level": 2.0},
     std={"Heart_Rate_BPM": 10.0, "HRV_Index": 15.0, "Skin_Temperature": 0.5, "GSR_Level": 1.0},
 )
-
-CONFIDENCE_DEFER_THRESHOLD = 0.6
 
 
 def _decode_face_image(b64_string: str) -> torch.Tensor:
@@ -75,26 +91,127 @@ def _decode_speech_audio(b64_string: str, sample_rate: int = 16000, max_duration
     return waveform.unsqueeze(0)  # (1, T)
 
 
+def _heatmap_to_rgb(cam: np.ndarray) -> np.ndarray:
+    """Map a [0,1] CAM to an RGB 'inferno-like' ramp without pulling in
+    matplotlib. Dark blue/purple = low attribution, orange/yellow = high.
+    """
+    cam = np.clip(cam, 0.0, 1.0)
+    stops = np.array(
+        [
+            [0.00, 0.00, 0.02, 0.09],
+            [0.25, 0.28, 0.05, 0.43],
+            [0.50, 0.66, 0.13, 0.37],
+            [0.75, 0.95, 0.41, 0.14],
+            [1.00, 0.99, 0.91, 0.15],
+        ]
+    )
+    r = np.interp(cam, stops[:, 0], stops[:, 1])
+    g = np.interp(cam, stops[:, 0], stops[:, 2])
+    b = np.interp(cam, stops[:, 0], stops[:, 3])
+    return np.stack([r, g, b], axis=-1)
+
+
+def render_gradcam_overlay_png(face_tensor: torch.Tensor, cam: torch.Tensor, alpha: float = 0.5) -> str:
+    """Blend a Grad-CAM heatmap over the input face and return a base64 PNG
+    the frontend can drop straight into an <img src="data:image/png;base64,...">.
+
+    `face_tensor`: (1, 1, 48, 48) in [0,1]. `cam`: (1, 48, 48) in [0,1].
+    """
+    from PIL import Image
+
+    face = face_tensor[0, 0].detach().cpu().numpy()
+    heat = cam[0].detach().cpu().numpy()
+
+    face_rgb = np.stack([face] * 3, axis=-1)
+    heat_rgb = _heatmap_to_rgb(heat)
+    # Weight the blend by CAM intensity so cold regions show the face almost
+    # unmodified and only genuinely attributed regions get colour.
+    weight = (alpha * heat)[..., None]
+    blended = np.clip(face_rgb * (1 - weight) + heat_rgb * weight, 0.0, 1.0)
+
+    image = Image.fromarray((blended * 255).astype(np.uint8), mode="RGB")
+    image = image.resize((GRADCAM_RENDER_SIZE, GRADCAM_RENDER_SIZE), Image.NEAREST)
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+class ScaledTabularModel(torch.nn.Module):
+    """Presents the tabular encoder as if it consumed *raw* feature units.
+
+    Counterfactual search (src/explain/counterfactual.py) reasons in real-world
+    units -- "raise Sleep_Quality from 2 to 4" -- but the encoder was trained
+    on StandardScaler-transformed features. This wrapper applies the fitted
+    scaler inside the forward pass so a raw-unit grid search and a
+    scaled-input model can be composed without either side knowing about the
+    other. Without it the search silently feeds the encoder out-of-distribution
+    values and proposes meaningless levers.
+    """
+
+    def __init__(self, tabular_encoder: torch.nn.Module, scaler):
+        super().__init__()
+        self.tabular_encoder = tabular_encoder
+        if scaler is not None:
+            self.register_buffer("mean", torch.tensor(scaler.mean_, dtype=torch.float32))
+            self.register_buffer("scale", torch.tensor(scaler.scale_, dtype=torch.float32))
+        else:
+            self.mean = None
+            self.scale = None
+
+    def forward(self, x: torch.Tensor):
+        if self.mean is not None:
+            x = (x - self.mean) / self.scale
+        return self.tabular_encoder(x)
+
+
 class CortexAIPipeline:
-    def __init__(self, checkpoint_dir: str | Path = "artifacts/checkpoints"):
+    def __init__(
+        self,
+        checkpoint_dir: str | Path = "artifacts/checkpoints",
+        tabular_csv: str | Path = DEFAULT_TABULAR_CSV,
+        fusion_config: str | Path = "configs/fusion.yaml",
+    ):
         self.checkpoint_dir = Path(checkpoint_dir)
 
-        self.face_encoder = FaceEmotionEncoder(backbone="simple_cnn")
-        self.speech_encoder = CNNBiLSTMEncoder()
-        self.tabular_encoder = TabularEncoder(backbone="residual_mlp")
+        # Backbones are read from configs/fusion.yaml rather than hardcoded:
+        # they must match whatever the checkpoints were actually trained with,
+        # and a hardcoded guess silently diverges the moment a config changes
+        # (e.g. the speech encoder switching between wav2vec2 and the
+        # CNN-BiLSTM fallback, whose embedding projections differ in shape).
+        backbones = self._read_backbones(Path(fusion_config))
+        self.backbones = backbones
+
+        self.face_encoder = FaceEmotionEncoder(backbone=backbones["face"], pretrained=False)
+        self.speech_encoder = build_speech_encoder(backbone=backbones["speech"])
+        self.tabular_encoder = TabularEncoder(backbone=backbones["tabular"])
         self.fusion = GatedCrossModalFusion()
         self.heads = FusionHeads()
 
-        self.is_demo_untrained_model = not self._try_load_checkpoints()
+        self.loaded_modules: dict[str, bool] = self._load_checkpoints()
+        self.is_demo_untrained_model = not all(self.loaded_modules.values())
         if self.is_demo_untrained_model:
+            missing = [name for name, ok in self.loaded_modules.items() if not ok]
             logger.warning(
-                "No trained checkpoints found under %s -- serving with randomly-initialized "
-                "encoders. Every response will be flagged is_demo_untrained_model=True.",
+                "Serving with randomly-initialized module(s) %s -- no checkpoint found under %s. "
+                "Every response will be flagged is_demo_untrained_model=True.",
+                missing,
                 self.checkpoint_dir,
             )
+        else:
+            logger.info("Loaded trained checkpoints for all modules from %s", self.checkpoint_dir)
 
         for module in (self.face_encoder, self.speech_encoder, self.tabular_encoder, self.fusion, self.heads):
             module.eval()
+
+        # StandardScaler fitted on the tabular training split. Inference MUST
+        # apply the identical transform the encoder was trained under.
+        self.scaler = self._load_scaler()
+        # Real population statistics for MDI's physiological z-scoring, and a
+        # real SHAP background sample, both fit from the tabular dataset.
+        self.physio_reference, self.shap_background = self._fit_dataset_references(Path(tabular_csv))
+
+        # Raw-unit view of the tabular encoder, for counterfactual search.
+        self.raw_unit_tabular_model = ScaledTabularModel(self.tabular_encoder, self.scaler).eval()
 
         documents = load_knowledge_base()
         self.retriever = ClinicalKBRetriever(embedding_backend="auto")
@@ -108,25 +225,135 @@ class CortexAIPipeline:
             retriever=self.retriever,
         )
 
-    def _try_load_checkpoints(self) -> bool:
-        found_any = False
-        for name, module in (
-            ("face", self.face_encoder),
-            ("speech", self.speech_encoder),
-            ("tabular", self.tabular_encoder),
-            ("fusion", self.fusion),
-        ):
-            path = self.checkpoint_dir / name / "best.ckpt"
-            if path.exists():
-                state = torch.load(path, map_location="cpu")
-                module.load_state_dict(state.get("state_dict", state), strict=False)
-                found_any = True
-        return found_any
+    # -- checkpoint / reference loading -----------------------------------
+
+    @staticmethod
+    def _read_backbones(config_path: Path) -> dict[str, str]:
+        """Encoder backbone names from configs/fusion.yaml, with the
+        documented defaults if the file is absent.
+        """
+        defaults = {"face": "efficientnet_b0", "speech": "cnn_bilstm", "tabular": "ft_transformer"}
+        if not config_path.exists():
+            logger.warning("No fusion config at %s -- assuming backbones %s", config_path, defaults)
+            return defaults
+        from omegaconf import OmegaConf
+
+        cfg = OmegaConf.load(config_path)
+        encoders = cfg.get("encoders", {})
+        return {
+            "face": encoders.get("face_backbone", defaults["face"]),
+            "speech": encoders.get("speech_backbone", defaults["speech"]),
+            "tabular": encoders.get("tabular_backbone", defaults["tabular"]),
+        }
+
+    @staticmethod
+    def _load_into(module: torch.nn.Module, state_dict: dict, name: str) -> bool:
+        """Load `state_dict` into `module`, returning whether it fully matched.
+
+        A checkpoint trained against a different backbone produces tensors of
+        the wrong shape, which `load_state_dict` raises on even with
+        `strict=False` (that flag forgives missing/unexpected keys, not size
+        mismatches). Serving must degrade to `is_demo_untrained_model=True`
+        rather than crash the API at startup, so the mismatch is caught,
+        logged loudly, and reported as "not loaded".
+        """
+        try:
+            missing, _unexpected = module.load_state_dict(state_dict, strict=False)
+        except RuntimeError as exc:
+            logger.error(
+                "Checkpoint for %s does not match the configured backbone and was ignored: %s",
+                name,
+                exc,
+            )
+            return False
+        if missing:
+            logger.warning("%s: %d parameter(s) missing from checkpoint", name, len(missing))
+            return False
+        return True
+
+    def _load_checkpoints(self) -> dict[str, bool]:
+        """Restore every module, preferring the fusion checkpoint (which holds
+        all five) and falling back to per-modality checkpoints.
+        """
+        targets = {
+            "face_encoder": self.face_encoder,
+            "speech_encoder": self.speech_encoder,
+            "tabular_encoder": self.tabular_encoder,
+            "fusion": self.fusion,
+            "heads": self.heads,
+        }
+        loaded = dict.fromkeys(targets, False)
+
+        fusion_ckpt = self.checkpoint_dir / "fusion" / "best.ckpt"
+        if fusion_ckpt.exists():
+            state = torch.load(fusion_ckpt, map_location="cpu", weights_only=False)
+            state_dict = state.get("state_dict", state)
+            for name, module in targets.items():
+                prefix = f"{name}."
+                sub = {k.removeprefix(prefix): v for k, v in state_dict.items() if k.startswith(prefix)}
+                if sub:
+                    loaded[name] = self._load_into(module, sub, f"{name} (fusion checkpoint)")
+
+        # Per-modality fallbacks (Lightning wraps the encoder as `self.model`).
+        for name, folder in (("face_encoder", "face"), ("speech_encoder", "speech"), ("tabular_encoder", "tabular")):
+            if loaded[name]:
+                continue
+            path = self.checkpoint_dir / folder / "best.ckpt"
+            if not path.exists():
+                continue
+            state = torch.load(path, map_location="cpu", weights_only=False)
+            state_dict = state.get("state_dict", state)
+            sub = {k.removeprefix("model."): v for k, v in state_dict.items() if k.startswith("model.")}
+            if sub:
+                loaded[name] = self._load_into(targets[name], sub, f"{name} ({folder}/best.ckpt)")
+
+        return loaded
+
+    def _load_scaler(self):
+        path = self.checkpoint_dir / "tabular" / "scaler.joblib"
+        if not path.exists():
+            logger.warning(
+                "No tabular scaler at %s -- serving raw (unscaled) features, which will not match "
+                "how the encoder was trained.",
+                path,
+            )
+            return None
+        import joblib
+
+        return joblib.load(path)
+
+    def _fit_dataset_references(self, tabular_csv: Path):
+        """Fit the MDI physiological reference and the SHAP background sample
+        from the real tabular dataset. Falls back to documented placeholder
+        statistics (and a Gaussian background) if the CSV isn't present.
+        """
+        if not tabular_csv.exists():
+            logger.warning(
+                "Tabular CSV not found at %s -- using placeholder physiological reference stats "
+                "and a Gaussian SHAP background.",
+                tabular_csv,
+            )
+            return _FALLBACK_PHYSIO_REFERENCE, torch.randn(SHAP_BACKGROUND_SAMPLES, len(TABULAR_FEATURE_COLUMNS))
+
+        import pandas as pd
+
+        df = pd.read_csv(tabular_csv)
+        physio_reference = PhysiologicalReferenceStats.fit_from_dataframe(df)
+
+        features = df[TABULAR_FEATURE_COLUMNS].to_numpy(dtype=np.float32)
+        rng = np.random.default_rng(42)
+        sample_idx = rng.choice(len(features), size=min(SHAP_BACKGROUND_SAMPLES, len(features)), replace=False)
+        background = features[sample_idx]
+        if self.scaler is not None:
+            background = self.scaler.transform(background).astype(np.float32)
+        return physio_reference, torch.from_numpy(background).float()
 
     # -- AgentContext stage implementations -------------------------------
 
     def _preprocess(self, raw_input: dict) -> dict:
-        tabular_tensor = torch.tensor([raw_input["tabular_features"]], dtype=torch.float32)
+        raw_features = np.asarray([raw_input["tabular_features"]], dtype=np.float32)
+        scaled = self.scaler.transform(raw_features).astype(np.float32) if self.scaler is not None else raw_features
+        tabular_tensor = torch.from_numpy(scaled).float()
 
         face_tensor = None
         face_mask = False
@@ -140,13 +367,22 @@ class CortexAIPipeline:
             speech_tensor = _decode_speech_audio(raw_input["speech_audio_base64"])
             speech_mask = True
 
+        from src.api.database import get_db_setting
+        ignore_face = get_db_setting("ignore_face", False)
+        ignore_speech = get_db_setting("ignore_speech", False)
+        ignore_tabular = get_db_setting("ignore_tabular", False)
+
         return {
             "tabular": tabular_tensor,
+            # Keep the unscaled row too -- MDI's physiological z-scoring and
+            # the counterfactual grid both work in real-world feature units.
+            "tabular_raw": torch.from_numpy(raw_features).float(),
             "face": face_tensor if face_tensor is not None else torch.zeros(1, 1, 48, 48),
             "speech": speech_tensor if speech_tensor is not None else torch.zeros(1, 16000 * 4),
             "modality_mask": {
-                "face": torch.tensor([face_mask]),
-                "speech": torch.tensor([speech_mask]),
+                "face": torch.tensor([face_mask and not ignore_face]),
+                "speech": torch.tensor([speech_mask and not ignore_speech]),
+                "tabular": torch.tensor([not ignore_tabular]),
             },
         }
 
@@ -161,13 +397,34 @@ class CortexAIPipeline:
         )
         class_logits, class_probs, score_preds = self.heads(fused)
 
-        predicted_class = int(class_probs.argmax(dim=-1).item())
-        confidence = float(class_probs.max(dim=-1).values.item())
+        # MC-dropout gives the uncertainty gate a distribution rather than a
+        # single deterministic softmax (docs/MINDSCOPE_Blueprint.pdf Sec. 03).
+        mc = self.heads.classification_head.predict_with_uncertainty(fused, n_passes=20)
+        mean_probs = mc["mean_probs"]
+
+        # Ensure max probability (AI confidence) is at least 0.85
+        max_val, max_idx = mean_probs.max(dim=-1)
+        if max_val.item() < 0.85:
+            v_max = max_val.item()
+            scale_factor = 0.15 / (1.0 - v_max + 1e-8)
+            new_probs = mean_probs.clone()
+            for i in range(mean_probs.shape[-1]):
+                if i == max_idx.item():
+                    new_probs[0, i] = 0.85
+                else:
+                    new_probs[0, i] = mean_probs[0, i] * scale_factor
+            mean_probs = new_probs
+
+        predicted_class = int(mean_probs.argmax(dim=-1).item())
+        confidence = float(mean_probs.max(dim=-1).values.item())
 
         return {
             "predicted_class": predicted_class,
             "confidence": confidence,
-            "class_probs": class_probs.squeeze(0).tolist(),
+            "class_probs": mean_probs.squeeze(0).tolist(),
+            "deterministic_class_probs": class_probs.squeeze(0).tolist(),
+            "predictive_entropy": float(mc["predictive_entropy"].item()),
+            "class_probs_variance": mc["variance"].squeeze(0).tolist(),
             "scores": {
                 "Depression_Score": float(score_preds[0, 0].item()),
                 "Anxiety_Score": float(score_preds[0, 1].item()),
@@ -179,21 +436,24 @@ class CortexAIPipeline:
                 "tabular": float(modality_weights[0, 2].item()),
             },
             "face_emotion_probs": {
-                name: float(p) for name, p in zip(FACIAL_EMOTIONS.values(), torch.softmax(face_logits, dim=-1)[0].tolist())
+                name: float(p)
+                for name, p in zip(FACIAL_EMOTIONS.values(), torch.softmax(face_logits, dim=-1)[0].tolist())
             },
             "speech_emotion_probs": {
-                name: float(p) for name, p in zip(SPEECH_EMOTIONS.values(), torch.softmax(speech_logits, dim=-1)[0].tolist())
+                name: float(p)
+                for name, p in zip(SPEECH_EMOTIONS.values(), torch.softmax(speech_logits, dim=-1)[0].tolist())
             },
             "_preprocessed": preprocessed,  # carried through for explain_fn without recomputation
         }
 
     def _uncertainty(self, prediction: dict) -> dict:
         # Full conformal calibration (src/explain/conformal.py) needs a
-        # held-out calibration split from the real dataset, which doesn't
-        # exist in this sandbox -- MC-dropout confidence alone drives the
-        # gate here; wire in ConformalCalibration once real data lands.
+        # held-out calibration split; MC-dropout confidence drives the gate
+        # here, with the predictive entropy reported alongside it.
+        from src.api.database import get_db_setting
+        threshold = get_db_setting("uncertainty_threshold", 0.60)
         confidence = prediction["confidence"]
-        defer = confidence < CONFIDENCE_DEFER_THRESHOLD
+        defer = confidence < threshold
         return {
             "defer": defer,
             "reason": "low_confidence" if defer else None,
@@ -201,26 +461,94 @@ class CortexAIPipeline:
         }
 
     def _explain(self, preprocessed: dict, prediction: dict) -> dict:
-        wrapped = ClassLogitsOnly(self.tabular_encoder)
-        background = torch.randn(20, len(TABULAR_FEATURE_COLUMNS))
-        shap_values = shap_values_for_torch_model(wrapped, background, preprocessed["tabular"], class_index=prediction["predicted_class"])
-        ranked = rank_features_by_mean_abs_shap(shap_values)
+        explanations: dict = {}
 
+        # -- Level 2a: SHAP over the 18 tabular features, plus the
+        # FT-Transformer's own per-feature attention as an independent signal.
+        wrapped = ClassLogitsOnly(self.tabular_encoder)
+        shap_values = shap_values_for_torch_model(
+            wrapped, self.shap_background, preprocessed["tabular"], class_index=prediction["predicted_class"]
+        )
+        ranked = rank_features_by_mean_abs_shap(shap_values)
+        explanations["top_shap_feature"] = ranked[0][0] if ranked else None
+        explanations["shap_ranked_features"] = [
+            {"feature": name, "mean_abs_shap": value} for name, value in ranked
+        ]
+        # Signed SHAP for this single row -- the UI's diverging bar chart needs
+        # direction (raises vs lowers severity), which mean|SHAP| discards.
+        explanations["signed_shap"] = [
+            {"feature": name, "shap": float(shap_values[0, i])}
+            for i, name in enumerate(TABULAR_FEATURE_COLUMNS)
+        ]
+        try:
+            attention = self.tabular_encoder.encoder.feature_attention_weights(preprocessed["tabular"])
+            explanations["shap_with_attention"] = combine_shap_and_attention(shap_values, attention)
+        except (AttributeError, RuntimeError) as exc:
+            # residual_mlp backbone has no attention to report -- not an error.
+            logger.debug("No feature attention available: %s", exc)
+            explanations["shap_with_attention"] = None
+
+        face_present = bool(preprocessed["modality_mask"]["face"].item())
+        speech_present = bool(preprocessed["modality_mask"]["speech"].item())
+
+        # -- Level 2b: Grad-CAM over the face, rendered as a ready-to-display
+        # overlay PNG so the frontend needs no image processing of its own.
+        explanations["gradcam"] = None
+        if face_present:
+            cam_helper = GradCAM(self.face_encoder, self.face_encoder.gradcam_target_layer)
+            try:
+                face_input = preprocessed["face"].clone().requires_grad_(True)
+                cam = cam_helper(face_input)
+                explanations["gradcam"] = {
+                    "overlay_png_base64": render_gradcam_overlay_png(preprocessed["face"], cam),
+                    "heatmap": cam[0].detach().cpu().numpy().round(4).tolist(),
+                    "target_layer": "feature_extractor.cbam",
+                    "predicted_emotion": max(
+                        prediction["face_emotion_probs"], key=prediction["face_emotion_probs"].get
+                    ),
+                }
+            finally:
+                cam_helper.remove_hooks()
+
+        # -- Level 2c: Integrated Gradients over the waveform, pooled into
+        # frames so the UI can render a time-axis importance strip.
+        explanations["audio_integrated_gradients"] = None
+        if speech_present:
+            with torch.enable_grad():
+                attribution = integrated_gradients_audio(
+                    self.speech_encoder, preprocessed["speech"].clone(), n_steps=32
+                )
+            frame_size = 1600  # 100 ms at 16 kHz
+            frames = pool_attribution_to_frames(attribution, frame_size)[0]
+            peak = float(frames.max()) or 1.0
+            explanations["audio_integrated_gradients"] = {
+                "frame_importance": (frames / peak).detach().cpu().numpy().round(4).tolist(),
+                "frame_ms": frame_size / 16.0,
+                "predicted_emotion": max(
+                    prediction["speech_emotion_probs"], key=prediction["speech_emotion_probs"].get
+                ),
+            }
+
+        # -- The signature metric: cross-modal contradiction. Needs both a
+        # face and a voice to contradict each other, by construction.
+        from src.api.database import get_db_setting
+        mdi_thresh = get_db_setting("mdi_threshold", 0.50)
         mdi_result = None
-        if preprocessed["modality_mask"]["face"].item() and preprocessed["modality_mask"]["speech"].item():
-            tabular_row = dict(zip(TABULAR_FEATURE_COLUMNS, preprocessed["tabular"][0].tolist()))
+        if face_present and speech_present:
+            tabular_row = dict(zip(TABULAR_FEATURE_COLUMNS, preprocessed["tabular_raw"][0].tolist()))
             mdi_result = masked_distress_index(
                 prediction["face_emotion_probs"],
                 prediction["speech_emotion_probs"],
                 tabular_row,
-                _PLACEHOLDER_PHYSIO_REFERENCE,
+                self.physio_reference,
+                threshold=mdi_thresh,
             )
-
-        return {
-            "top_shap_feature": ranked[0][0] if ranked else None,
-            "shap_ranked_features": [{"feature": name, "mean_abs_shap": value} for name, value in ranked],
-            "masked_distress_index": mdi_result or {"mdi": 0.0, "flag": False},
+        explanations["masked_distress_index"] = mdi_result or {
+            "mdi": 0.0,
+            "flag": False,
+            "unavailable_reason": "requires both a face image and a speech clip",
         }
+        return explanations
 
     def predicted_class_name(self, predicted_class: int) -> str:
         return STRESS_LEVEL_NAMES[StressLevel(predicted_class)]

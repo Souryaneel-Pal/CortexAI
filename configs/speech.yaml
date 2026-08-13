@@ -3,11 +3,11 @@
 modality: speech
 
 data:
-  root: data/raw/speech
+  root: data/raw/Audios
   sample_rate: 16000
   max_duration_sec: 4.0   # RAVDESS clips are pad/truncated to this for batching
   num_classes: 8
-  batch_size: 16
+  batch_size: 32
   num_workers: 4
   val_split: 0.15
   test_split: 0.15
@@ -34,6 +34,10 @@ imbalance:
   strategy: class_balanced_focal   # addresses RAVDESS Neutral 96 vs others 192
   focal_gamma: 2.0
   class_balanced_beta: 0.999
+  # Deliberately false: RAVDESS is only 2:1 imbalanced and class-balanced
+  # focal loss already covers it. Adding a balanced sampler double-corrects
+  # and collapses the model onto 'neutral' (measured: 6.7% val accuracy).
+  use_balanced_sampler: false
 
 augment:
   spec_augment: true
@@ -43,7 +47,12 @@ augment:
 train:
   epochs: 40
   optimizer: adamw
-  lr: 1.0e-4
+  # Tuned for the ACTIVE backbone above (wav2vec2). Fine-tuning a pretrained
+  # transformer needs a small step -- at 5e-4 the pretrained representations
+  # are destroyed in the first epochs and the model collapses to a single
+  # class (measured: 13.3% val accuracy, flat). The cnn_bilstm fallback
+  # trains from scratch and wants ~5e-4 instead; change this with the backbone.
+  lr: 5.0e-5
   weight_decay: 1.0e-4
   scheduler: cosine
   early_stopping_patience: 8

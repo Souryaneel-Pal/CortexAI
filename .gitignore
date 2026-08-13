@@ -5,6 +5,7 @@ __pycache__/
 *.so
 .Python
 env/
+env.example/
 venv/
 .venv/
 ENV/
@@ -59,3 +60,6 @@ logs/
 wandb/
 mlruns/
 .hydra/
+
+# SQLite databases
+*.db

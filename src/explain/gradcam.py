@@ -51,14 +51,16 @@ class GradCAM:
         was_training = self.model.training
         self.model.eval()
 
-        _embedding, logits = self.model(x)
-        if target_class is None:
-            target_class = logits.argmax(dim=-1)
-        elif isinstance(target_class, int):
-            target_class = torch.full((x.shape[0],), target_class, device=x.device, dtype=torch.long)
+        with torch.enable_grad():
+            x_input = x.clone().detach().requires_grad_(True)
+            _embedding, logits = self.model(x_input)
+            if target_class is None:
+                target_class = logits.argmax(dim=-1)
+            elif isinstance(target_class, int):
+                target_class = torch.full((x_input.shape[0],), target_class, device=x_input.device, dtype=torch.long)
 
-        selected = logits.gather(1, target_class.unsqueeze(1)).squeeze(1)
-        selected.sum().backward()
+            selected = logits.gather(1, target_class.unsqueeze(1)).squeeze(1)
+            selected.sum().backward()
 
         weights = self._gradients.mean(dim=(2, 3), keepdim=True)  # (B, C, 1, 1)
         cam = F.relu((weights * self._activations).sum(dim=1))  # (B, H', W')

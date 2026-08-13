@@ -13,12 +13,11 @@ export interface NavItem {
  * (non-navigating) items rather than being invented.
  */
 export const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/' },
+  { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/dashboard' },
   { id: 'new-assessment', label: 'New Assessment', icon: 'add_circle', path: '/assessment/new' },
-  { id: 'results', label: 'Results', icon: 'fact_check' },
-  { id: 'insights', label: 'AI Insights', icon: 'psychology', path: '/insights' },
+  { id: 'results', label: 'Results', icon: 'fact_check', path: '/results' },
   { id: 'reports', label: 'Reports', icon: 'assessment', path: '/reports' },
   { id: 'analytics', label: 'Analytics', icon: 'analytics', path: '/analytics' },
 ]
 
-export const SETTINGS_ITEM: NavItem = { id: 'settings', label: 'Settings', icon: 'settings' }
+export const SETTINGS_ITEM: NavItem = { id: 'settings', label: 'Settings', icon: 'settings', path: '/settings' }

@@ -1,6 +1,7 @@
 import pytest
 
 from src.reasoning.agent_graph import AgentContext, answer_follow_up, build_agent_graph
+from src.reasoning.rag_report import generate_cached_report
 from src.reasoning.retriever import ClinicalKBRetriever, load_knowledge_base
 
 
@@ -12,7 +13,18 @@ def real_retriever():
     return retriever
 
 
-def _make_context(real_retriever, predicted_class=1, confidence=0.85, defer=False, mdi=0.1):
+def _make_context(real_retriever, predicted_class=1, confidence=0.85, defer=False, mdi=0.1, report_fn=None):
+    """Build an AgentContext with deterministic stage functions.
+
+    `report_fn` defaults to the templated generator rather than the module
+    default (a live local `llama3.1`). These are *orchestration* tests -- they
+    assert that the graph sequences stages, propagates the deferral flag, and
+    force-attaches crisis documents. Letting them call a real LLM would make
+    them slow (~50 s), non-deterministic in wording, and dependent on whether
+    Ollama happens to be running on the machine executing the suite. The
+    Ollama generator has its own dedicated coverage in
+    tests/test_ollama_reasoning.py.
+    """
     def preprocess_fn(raw_input):
         return {"features": raw_input.get("features", [0.0] * 18)}
 
@@ -39,6 +51,7 @@ def _make_context(real_retriever, predicted_class=1, confidence=0.85, defer=Fals
         uncertainty_fn=uncertainty_fn,
         explain_fn=explain_fn,
         retriever=real_retriever,
+        report_fn=report_fn or generate_cached_report,
     )
 
 
@@ -54,7 +67,9 @@ def test_full_pipeline_runs_end_to_end(real_retriever):
     assert len(result["retrieved_docs"]) > 0
     assert result["report"].valid is True
     assert "preprocess: ok" in result["log"]
-    assert "report: cached=True" in result["log"]  # no ANTHROPIC_API_KEY in this sandbox
+    # The templated generator is injected here, so this asserts the graph
+    # reports the generator's own `cached` flag rather than inventing one.
+    assert "report: cached=True" in result["log"]
 
 
 def test_severe_prediction_always_attaches_crisis_docs(real_retriever):
@@ -104,3 +119,38 @@ def test_answer_follow_up_reuses_prediction_without_repredicting(real_retriever)
     assert follow_up_report.valid is True
     # The follow-up report is grounded in the SAME predicted class, not a new prediction.
     assert final_state["prediction"]["predicted_class"] == 1
+
+
+def test_graph_uses_the_injected_report_generator(real_retriever):
+    """The graph must call whatever generator it was given and surface that
+    result verbatim -- it never second-guesses or rewrites the report."""
+    calls = []
+
+    def recording_report_fn(prediction, docs):
+        calls.append((prediction, docs))
+        return generate_cached_report(prediction, docs, fallback_reason="injected for test")
+
+    context = _make_context(real_retriever, report_fn=recording_report_fn)
+    result = build_agent_graph(context).invoke({"raw_input": {}, "log": []})
+
+    assert len(calls) == 1
+    # The deferral decision is passed through to the generator, not recomputed.
+    assert "deferred_to_human" in calls[0][0]
+    assert result["report"].fallback_reason == "injected for test"
+
+
+def test_graph_survives_a_report_generator_that_degrades(real_retriever):
+    """An unreachable LLM must not break the graph: the report node still
+    produces a valid, cited ReportResult."""
+
+    def degrading_report_fn(prediction, docs):
+        return generate_cached_report(prediction, docs, fallback_reason="Ollama unreachable in this test")
+
+    context = _make_context(real_retriever, report_fn=degrading_report_fn)
+    result = build_agent_graph(context).invoke({"raw_input": {}, "log": []})
+
+    report = result["report"]
+    assert report.valid is True
+    assert report.cached is True
+    assert report.citations
+    assert "Ollama unreachable" in report.fallback_reason
