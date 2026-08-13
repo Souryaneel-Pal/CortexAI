@@ -1,1 +1,49 @@
+# Byte-compiled / Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Data & Datasets (DO NOT COMMIT RAW MEDIA)
+data/raw/
+data/processed/
+*.zip
+*.tar.gz
+*.csv
+
+# Model Checkpoints & Artifacts
+artifacts/
+checkpoints/
+*.pth
+*.pt
+*.onnx
+*.bin
+*.safetensors
+*.joblib
+*.pkl
+
+# RAG & Vector Indices
+faiss_index/
+*.index
+
+# Environment & API Keys
 .env
+.env.local
+*.pem
+
+# IDE & System Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs & Tracking
+logs/
+wandb/
+mlruns/
+.hydra/
